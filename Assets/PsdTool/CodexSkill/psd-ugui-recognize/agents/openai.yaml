@@ -1,0 +1,4 @@
+interface:
+  display_name: "PSD UI 识别"
+  short_description: "识别 Unity 导出的 PSD 控件区域，生成可校验的回传结果，不修改项目"
+  default_prompt: "Use $psd-ugui-recognize to inspect the supplied Unity PSD task and write its result.json."

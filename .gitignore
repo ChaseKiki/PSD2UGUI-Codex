@@ -1,0 +1,62 @@
+# Unity-generated project state
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/[Bb]uild/
+/[Bb]uilds/
+/[Mm]emoryCaptures/
+/[Rr]ecordings/
+.vs/
+.idea/
+.vscode/
+*.csproj
+*.sln
+*.suo
+*.user
+*.pidb
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# Local tool state and project outputs, including folder metadata
+Assets/PsdTool/PsdToolSettings.asset*
+Assets/PsdTool/Data/
+Assets/PsdTool/Data.meta
+Assets/PsdTool/Editor/Data/
+Assets/PsdTool/Editor/Data.meta
+Assets/PsdTool/Runtime/Generated/
+Assets/PsdTool/Runtime/Generated.meta
+Assets/PsdTool/Editor/Tests/
+Assets/PsdTool/Editor/Tests.meta
+Assets/UI/
+Assets/UI.meta
+Assets/PsdToolVerification/
+Assets/PsdToolVerification.meta
+
+# Credentials and task-local agent state
+.env
+.env.*
+!.env.example
+/.codex/
+/.agents/
+auth.json
+credentials.json
+*.pem
+*.key
+
+# Commercial source art and machine-local artifacts
+*.psd
+*.psb
+*.log
+*.tmp
+*.bak
+*.orig
+*.rej
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Keep Unity .meta files and the curated Releases directory tracked.

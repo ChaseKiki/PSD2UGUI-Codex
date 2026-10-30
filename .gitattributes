@@ -1,0 +1,14 @@
+* text=auto
+*.cs text eol=lf
+*.asmdef text eol=lf
+*.meta text eol=lf whitespace=-blank-at-eol
+.gitignore text eol=lf
+.gitattributes text eol=lf
+LICENSE text eol=lf
+*.md text eol=lf
+*.jsx text eol=lf
+*.yaml text eol=lf
+*.unitypackage binary
+*.png binary
+*.jpg binary
+*.zip binary
