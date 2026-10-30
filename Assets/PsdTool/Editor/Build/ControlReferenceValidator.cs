@@ -73,6 +73,22 @@ namespace PsdTool
         internal static void EnsureValid(GameObject root, ControlBuildContext context = null)
         {
             var errors = Details(root);
+            if (context != null)
+                foreach (var owner in context.ControlOwners)
+                {
+                    var node = context.Tree.Find(owner.Value);
+                    if (node?.templateId == "Toggle")
+                    {
+                        var toggle = owner.Key.GetComponent<Toggle>();
+                        if (toggle != null) Check(toggle.graphic != null, toggle, "缺少 checkmark/on 勾选图，保留外观待绑定", errors);
+                    }
+                    if (node?.templateId == "Slider")
+                    {
+                        var slider = owner.Key.GetComponent<Slider>();
+                        if (slider != null) Check(slider.fillRect != null && slider.handleRect != null && slider.targetGraphic != null,
+                            slider, "缺少 fill/handle/targetGraphic，保留外观待绑定", errors);
+                    }
+                }
             if (errors.Count != 0 && context != null)
             {
                 var issue = errors[0];

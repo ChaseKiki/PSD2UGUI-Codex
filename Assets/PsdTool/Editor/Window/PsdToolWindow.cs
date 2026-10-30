@@ -158,6 +158,9 @@ namespace PsdTool
                         if (PsdEditorUI.Action("资源管理")) ResourceManagerWindow.Open(_settings);
                 }
                 if (_tree != null && PsdEditorUI.Action("查看最近识别进度")) CodexTaskWindow.Open(_tree, _settings);
+                using (new EditorGUI.DisabledScope(_tree == null || string.IsNullOrEmpty(_tree.prefabGuid)))
+                    if (PsdEditorUI.Action("导出干净 Prefab 副本…"))
+                        CleanPrefabExportWindow.Open(AssetDatabase.LoadAssetAtPath<GameObject>(AssetDatabase.GUIDToAssetPath(_tree.prefabGuid)));
                 EditorGUILayout.BeginHorizontal();
                 using (new EditorGUI.DisabledScope(_settings == null))
                     if (GUILayout.Button("重建资源索引")) Run(() => SpriteIndex.Rebuild(_settings));
@@ -402,6 +405,15 @@ namespace PsdTool
                 tIndex = EditorGUILayout.Popup("控件类型", tIndex, Markers.TemplateLabels);
                 n.templateId = Markers.TemplateIds[tIndex];
                 if (n.templateId == "Progress") PsdProgressUI.Draw(n);
+                if (n.templateId == "ScrollView" && GUILayout.Button("排列与自适应…"))
+                    ScrollLayoutWindow.Open(n, options =>
+                    {
+                        if ((n.locks & (PropGroup.Component | PropGroup.Rect)) != 0) throw new InvalidOperationException("请先解除组件或矩形锁定。");
+                        if (n.slot == "template" || _tree.Find(n.parentId)?.templateId == "Dropdown") throw new InvalidOperationException("Dropdown 模板由 TMP 管理排列。");
+                        Undo.RegisterCompleteObjectUndo(_tree, "配置列表排列"); ScrollLayoutOptions.Copy(options, n);
+                        EditorUtility.SetDirty(_tree); AssetDatabase.SaveAssetIfDirty(_tree);
+                        if (AiMarker.Last?.tree == _tree) { AiMarker.Last.generated = false; AiMarker.Last.generationChecked = false; }
+                    });
 
                 int sIndex = Mathf.Max(0, Array.IndexOf(SlotChoices, n.slot ?? string.Empty));
                 sIndex = EditorGUILayout.Popup("插槽", sIndex, SlotLabels);
@@ -448,9 +460,12 @@ namespace PsdTool
 
                 if (n.templateId == "Button")
                 {
-                    float scale = n.pressScale < 0f ? _settings.buttonPressScale : n.pressScale;
+                    float scale = n.pressScale < 0f ? _settings.addButtonPressScale ? _settings.buttonPressScale : 1f : n.pressScale;
+                    bool enabled = scale < .999f;
+                    bool nextEnabled = EditorGUILayout.Toggle("启用按压缩放", enabled);
+                    if (nextEnabled != enabled) { n.pressScale = scale = nextEnabled ? _settings.buttonPressScale : 1f; }
                     EditorGUI.BeginChangeCheck();
-                    scale = EditorGUILayout.Slider("按下缩放", scale, 0.5f, 1f);
+                    using (new EditorGUI.DisabledScope(!nextEnabled)) scale = EditorGUILayout.Slider("按下缩放", scale, 0.5f, 1f);
                     if (EditorGUI.EndChangeCheck()) n.pressScale = scale;
                     if (GUILayout.Button("恢复默认缩放", GUILayout.Width(120))) n.pressScale = -1f;
                 }

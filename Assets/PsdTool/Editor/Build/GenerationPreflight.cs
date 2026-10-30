@@ -15,6 +15,7 @@ namespace PsdTool
     [Serializable] internal sealed class GenerationIssue
     {
         public int layerId;
+        public bool placeholder;
         public string nodePath, type, message;
         public string resolution = "本次保留外观，暂不更新该控件交互；请定位并确认控件类型与部件插槽。已有人工/历史组件不会自动删除，需单独验收。";
     }
@@ -42,6 +43,11 @@ namespace PsdTool
                     try
                     {
                         var draft = PrefabGenerator.BuildDraft(copy, settings);
+                        foreach (var repair in draft.Repairs)
+                        {
+                            repair.nodePath = PathOf(tree, repair.layerId);
+                            found.Add(repair);
+                        }
                         string source = AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(tree));
                         if (!string.IsNullOrEmpty(source))
                             foreach (var id in draft.Root.GetComponentsInChildren<PsdGeneratedNode>(true)) id.sourceGuid = source;

@@ -70,6 +70,9 @@ namespace PsdTool
 
         [Header("控件")]
         public int minHitSize = 88;
+        [Tooltip("可选附加表现；默认不生成。单个按钮可在节点面板单独启用缩放。")]
+        public bool addButtonPressScale;
+        public bool addButtonGray;
         [Range(0.5f, 1f)] public float buttonPressScale = 0.95f;
         public float buttonPressDuration = 0.1f;
         [Tooltip("距父节点边缘 ≤ 该值时推断锚到该边")]

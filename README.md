@@ -4,9 +4,9 @@
 
 **Unity 内的 PSD → uGUI Prefab 工具：从分层设计稿开始，用 Codex 辅助识别、重组、绑定，再由程序审核和生成。**
 
-支持普通中文图层名称，减少规则命名、重复切图、手动摆放和组件引用绑定。当前为 **Preview**，内置版本 `2026.10.30-preview.11`；复杂页面仍需要人工验收。
+支持普通中文图层名称，减少规则命名、重复切图、手动摆放和组件引用绑定。当前为 **Preview**，内置版本 `2026.10.30-preview.12`；复杂页面仍需要人工验收。
 
-- [下载 Unity 安装包](Releases/preview.11/PsdTool-2026.10.30-preview.11.unitypackage)
+- [下载 Unity 安装包](Releases/preview.12/PsdTool-2026.10.30-preview.12.unitypackage)
 - [完整使用说明](Assets/PsdTool/Documentation/使用说明.md)
 - [更新记录](Assets/PsdTool/Documentation/发布说明.md)
 - [MIT 许可证](LICENSE)
@@ -32,6 +32,12 @@
 - **资源管理**：可配置输出目录，支持图片去重/复用、九宫格检查、图集、Android/iOS 新纹理配置，以及资源引用检查。已有人工导入设置受保护。
 - **布局细节**：按钮热区取正常底图、文字等视觉并集；ScrollRect 的 Handle 按可视区/内容尺寸计算，空列表或不足一屏时铺满轨道。Progress 可手工配置线性或径向填充。
 - **图片效果**：可调用本机 Photoshop，在临时副本上烘焙图片图层 FX；原 PSD 不直接修改。文字继续使用 TMP，部分效果近似还原。
+
+## 本次更新：preview.12
+
+- ScrollView 可逐项手动添加排列与尺寸自适应，默认保持 PSD。
+- 按钮附加表现默认关闭，增量标识隐藏；支持另存干净 Prefab，保护必要组件及事件引用。
+- 不完整进度条补建占位，父级完整方案可直接应用；展开态遮挡结合来源图层处理。
 
 ## 环境与前置要求
 
@@ -88,7 +94,7 @@
 - `Assets/PsdTool/Photoshop`：图片 FX 烘焙脚本。
 - `Assets/PsdTool/CodexSkill`：随任务提供的识别 skill 和结果协议。
 - `Assets/PsdTool/Documentation`：使用文档和变更记录。
-- `Releases/preview.11`：已验证的 Unity 安装包及 SHA256。
+- `Releases/preview.12`：已验证的 Unity 安装包及 SHA256。
 
 本仓库不含业务工程、PSD/图片/字体、历史项目配置、生成 Prefab、缓存或带本机路径的测试夹具。维护和报告问题请见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 

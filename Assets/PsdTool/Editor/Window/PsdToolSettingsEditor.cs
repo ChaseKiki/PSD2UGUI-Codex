@@ -14,7 +14,7 @@ namespace PsdTool
             Group(ref output, "输出目录与设计尺寸", "panelSprites", "panelTextures", "panelPrefabs", "panelAtlas", "moduleSprites", "moduleAtlas", "commonSprites", "commonTextures", "commonAtlas", "designResolution", "canvasMatch");
             Group(ref fonts, "字体与文字材质", "defaultFont", "fontMappings", "materialPresetFolder");
             Group(ref recognition, "识别选项", "aiImageMaxSide", "aiAllowStructure", "aiAutoApplyMin");
-            Group(ref controls, "控件与适配", "minHitSize", "buttonPressScale", "buttonPressDuration", "anchorSnap", "ruleAutoApplyMin");
+            Group(ref controls, "控件与适配", "minHitSize", "addButtonPressScale", "buttonPressScale", "buttonPressDuration", "addButtonGray", "anchorSnap", "ruleAutoApplyMin");
             Group(ref textures, "贴图与图集", "largeImageThreshold", "textureMaxSize", "textureFilter", "textureCompression", "texturePlatforms", "atlasMaxSize", "atlasPadding", "atlasIncludeInBuild");
             Group(ref storage, "编辑数据与回收目录", "toolDataRoot", "resourceRecycleFolder");
             Group(ref photoshop, "Photoshop 与图片效果", "bakeImageEffects", "photoshopTimeoutSeconds");

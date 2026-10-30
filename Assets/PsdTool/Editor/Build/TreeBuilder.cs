@@ -115,6 +115,7 @@ namespace PsdTool
                 if (!string.IsNullOrEmpty(prev.stableKey)) node.stableKey = prev.stableKey;
                 node.generatedAssetGuid = prev.generatedAssetGuid;
                 node.resourceOverride = prev.resourceOverride;
+                ScrollLayoutOptions.Copy(prev, node);
                 node.aiHasParentOverride = prev.aiHasParentOverride;
                 node.aiParentId = prev.aiParentId;
                 node.image = prev.image ?? new ImageInfo();

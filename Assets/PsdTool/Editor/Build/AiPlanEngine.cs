@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using TMPro;
@@ -155,6 +155,16 @@ namespace PsdTool
                 if (children.Count == 0) throw new InvalidOperationException("分组没有子图层。");
                 node.order = children.Min(n => n.order);
             }
+            // Conflicting explicit assignments remain invalid. Inherited, unrelated
+            // incomplete controls are handled separately by generation preflight.
+            foreach (var edit in edits.Where(e => e.setSlot && !string.IsNullOrEmpty(e.slot) && e.slot != "item"))
+            {
+                var node = tree.Find(edit.layerId);
+                var parent = tree.Find(node.parentId);
+                if (parent != null && PrefabGenerator.IsControl(parent.templateId) &&
+                    tree.nodes.Count(n => n.status != NodeStatus.PendingDelete && n.parentId == node.parentId && n.slot == node.slot) > 1)
+                    throw new InvalidOperationException("计划重复指定 " + node.slot + " 插槽，请确认唯一部件；其它方案仍可应用。");
+            }
         }
         internal static string GeneratedGroupName(AiGroupEdit group, string stableKey)
         {
@@ -232,30 +242,10 @@ namespace PsdTool
                 foreach (var n in validation.nodes.Where(n => n.kind != LayerKind.Group && n.kind != LayerKind.Text))
                     if (n.image.trimmedRect.width <= 0 && n.psdRect.width > 0)
                     { n.image.trimmedRect = n.psdRect; n.image.logicalRect = n.psdRect; n.image.isEmpty = false; n.image.isSolid = true; n.image.solidColor = Color.white; }
-                using (var draft = PrefabGenerator.BuildDraft(validation, settings))
-                {
-                    foreach (var dropdown in draft.Root.GetComponentsInChildren<TMP_Dropdown>(true))
-                        if (!dropdown.interactable || dropdown.template == null || dropdown.itemText == null && dropdown.itemImage == null)
-                            throw new InvalidOperationException("下拉识别缺少可用的展开层或选项模板，未应用计划。");
-                    foreach (var toggle in draft.Root.GetComponentsInChildren<Toggle>(true))
-                        if (toggle.graphic == null && tree.nodes.Any(n => (n.stableKey ?? "layer:" + n.layerId) == toggle.GetComponent<PsdGeneratedNode>()?.key && n.templateId == "Toggle"))
-                            throw new InvalidOperationException("Toggle 缺少 checkmark/on 勾选图：" + toggle.name);
-                    foreach (var slider in draft.Root.GetComponentsInChildren<Slider>(true))
-                        if (slider.fillRect == null || slider.handleRect == null || slider.targetGraphic == null)
-                            throw new InvalidOperationException("Slider 缺少 fill/handle/targetGraphic，不能标记为可应用。");
-                    foreach (var input in draft.Root.GetComponentsInChildren<TMP_InputField>(true))
-                        if (input.textComponent == null || input.textViewport == null || input.targetGraphic == null)
-                            throw new InvalidOperationException("InputField 缺少输入文字/Viewport/点击背景。");
-                    foreach (var progress in validation.nodes.Where(n => n.templateId == "Progress" && Relevant(n)))
-                    {
-                        var slots = validation.nodes.Where(n => n.parentId == progress.layerId).Select(n => n.slot).ToArray();
-                        if (!slots.Contains("fill") || progress.progressFill < ProgressFillMode.Radial360 && !slots.Contains("track")) throw new InvalidOperationException("Progress 缺少 track/fill，不能标记为完整控件。");
-                        var track = validation.nodes.Find(n => n.parentId == progress.layerId && n.slot == "track");
-                        var rect = track != null ? AiRegions.Bounds(validation, track) : new Rect();
-                        if (progress.progressFill == ProgressFillMode.Auto && Mathf.Max(rect.width, rect.height) < Mathf.Min(rect.width, rect.height) * 2)
-                            throw new InvalidOperationException("暂不支持环形进度条绑定，保留视觉节点。");
-                    }
-                }
+                // Use the same recoverable path as actual generation. A defective
+                // nested widget must not reject an otherwise valid parent structure.
+                // Edit/CheckParents still enforce identity, locks and inheritance.
+                using (var draft = GenerationPreflight.Build(validation, settings, new List<GenerationIssue>(), true)) { }
             }
             finally { Object.DestroyImmediate(validation); }
         }

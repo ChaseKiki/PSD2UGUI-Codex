@@ -79,3 +79,16 @@ Scrollbar travel follows its track background. With only a thumb image, the tool
 - FX fails: check Photoshop configuration and the diagnostic log. Unsupported effects may require an art-side adjustment.
 
 Other Unity versions/platforms and arbitrary PSDs are not guaranteed. Nested reusable-prefab substitution and business binding-code generation are not implemented. Read the [English README](../../../README.en.md) for the project overview, data handling and MIT license terms.
+
+
+## Preview.12: list layout and clean copies
+
+ScrollViews keep PSD positions by default. On an individual ScrollView recognition result, click **排列与自适应…** (Layout and sizing), or use the same button in node details. Choose vertical or horizontal layout, configure spacing/padding, save and regenerate. Native LayoutGroup + ContentSizeFitter controls the scrolling-axis size; initial items receive LayoutElement preferred dimensions. Dynamic items must provide appropriate preferred sizes. This deliberately rearranges items. Dropdown templates remain managed by TMP and do not receive this layout.
+
+Layout settings survive reparsing. Switching back to PSD mode leaves old generated components pending explicit removal review, following the incremental protection policy.
+
+New buttons no longer receive ButtonPressScale or UIGray by default. Enable these explicitly in project settings; individual buttons can enable press scaling in node details. Existing components are retained until removal review, to protect references and events. Incremental PsdGeneratedNode identity components are hidden in the Inspector, rather than deleted.
+
+Under **维护与审核 → 导出干净 Prefab 副本…** (Maintenance and review → Export clean prefab copy), save a new independent prefab. It removes unreferenced source markers and optionally press-scale/grayscale helpers, preserving necessary hit-area/state/safe-area/FX behaviour. Helpers referenced by retained components/events and components inside nested prefab instances remain protected and are counted in the export summary. Original prefab bytes, GUID and event references remain unchanged. The copy shares original image/font/material assets and is not an incremental source; regenerate it from the maintained original after revisions.
+
+Incomplete Progress controls retain source artwork and receive reported placeholder parts. A broken nested widget no longer rejects an otherwise usable parent structure plan. Child issues with an executable owner proposal provide **应用父级完整方案** (Apply complete parent plan). Expanded-dropdown occlusion in a composite screenshot is not by itself missing layer evidence; source sheets, hidden states and ownership remain relevant.

@@ -49,7 +49,7 @@ namespace PsdTool
                 item.status = row.applied ? (generated ? AiRegionStatus.Generated : AiRegionStatus.Applied) : row.error != null ? (row.error.StartsWith("暂不支持", StringComparison.Ordinal) ? AiRegionStatus.Unsupported : AiRegionStatus.Failed) : row.selected ? AiRegionStatus.Ready : AiRegionStatus.NeedsReview;
                 item.message = row.error ?? (row.applied ? generated ? "Prefab 已生成，请验收交互" : "已应用标记，尚未生成" : "等待确认");
                 if (generated && generationIssues.Any(i => i.layerId == item.rootId))
-                    item.message = "Prefab 已生成；该控件暂保留外观，交互仍需处理";
+                    item.message = generationIssues.Any(i => i.layerId == item.rootId && i.placeholder) ? "Prefab 已生成；已补建占位部件，请验收样式与参数" : "Prefab 已生成；该控件暂保留外观，交互仍需处理";
             }
             foreach (var item in regions.Where(r => r.proposalIndex < 0 && r.status != AiRegionStatus.Ignored))
             {

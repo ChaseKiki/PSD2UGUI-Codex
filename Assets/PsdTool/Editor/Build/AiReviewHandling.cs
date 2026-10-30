@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using UnityEngine;
+using UnityEditor;
 
 namespace PsdTool
 {
@@ -106,6 +107,28 @@ namespace PsdTool
             InstallReviewed(entry, proposal);
             ApplySelected(true, rows[entry.proposalIndex]);
         }
+        // Ownership comes from executable node edits, never from an AI prose
+        // sentence such as 'covered by 165'. Works with older imported reports too.
+        internal AiRegionResult StructuralOwner(AiRegionResult entry)
+        {
+            if (entry == null) return null;
+            return regions.FirstOrDefault(candidate => candidate != entry && candidate.status != AiRegionStatus.Ignored &&
+                (candidate.proposalIndex >= 0 && candidate.proposalIndex < rows.Count ? rows[candidate.proposalIndex].proposal : candidate.recoveryProposal)
+                ?.nodes?.Any(edit => edit.layerId == entry.rootId && edit.setTemplate && edit.templateId == entry.type) == true);
+        }
+        internal void ApplyOwnerRegion(AiRegionResult entry)
+        {
+            var owner = StructuralOwner(entry) ?? throw new InvalidOperationException("没有找到包含此节点的完整结构方案。可保留外观继续生成。");
+            if (owner.proposalIndex >= 0 && owner.proposalIndex < rows.Count && rows[owner.proposalIndex].applied)
+            { SaveReport(); return; }
+            if (owner.proposalIndex >= 0 && owner.proposalIndex < rows.Count &&
+                AiPlanEngine.Validate(tree, settings, rows[owner.proposalIndex].proposal, out _))
+            {
+                rows[owner.proposalIndex].error = null;
+                ApplySelected(true, rows[owner.proposalIndex]);
+            }
+            else OverrideRegion(owner);
+        }
         internal void ConfigureProgress(AiRegionResult entry, PsdNode options)
         {
             if (CurrentSignature() != signature) throw new InvalidOperationException("来源已变化，请先更新校验或重新识别。");
@@ -127,6 +150,28 @@ namespace PsdTool
             signature = CurrentSignature(); generated = false;
             entry.type = "Progress"; proposal.reason = "人工选择填充方式和方向，已校验部件；请应用此方案。";
             InstallReviewed(entry, proposal);
+        }
+        internal void ConfigureScrollLayout(AiRegionResult entry, PsdNode options)
+        {
+            if (CurrentSignature() != signature) throw new InvalidOperationException("来源已变化，请先更新校验。");
+            var node = ScrollLayoutNode(entry) ?? throw new InvalidOperationException("请先应用该结构方案，再配置新建 ScrollView 的排列。");
+            if ((node.locks & (PropGroup.Component | PropGroup.Rect)) != 0) throw new InvalidOperationException("该节点组件或矩形已锁定，请先解锁。");
+            if (node.slot == "template" || tree.Find(node.parentId)?.templateId == "Dropdown" ||
+                rows.Any(r => r.proposal?.nodes?.Any(e => e.layerId == node.layerId && e.setSlot && e.slot == "template") == true))
+                throw new InvalidOperationException("这是 Dropdown 展开模板，排列由 TMP 管理，不额外添加 LayoutGroup。");
+            Undo.RegisterCompleteObjectUndo(tree, "配置列表排列"); ScrollLayoutOptions.Copy(options, node);
+            EditorUtility.SetDirty(tree); AssetDatabase.SaveAssetIfDirty(tree);
+            signature = CurrentSignature(); generated = false; generationChecked = false; SaveReport();
+        }
+        internal PsdNode ScrollLayoutNode(AiRegionResult entry)
+        {
+            var root = tree.Find(entry.rootId);
+            if (root == null) return null;
+            var proposal = entry.proposalIndex >= 0 && entry.proposalIndex < rows.Count ? rows[entry.proposalIndex].proposal : entry.recoveryProposal;
+            if (proposal?.nodes?.Any(e => e.layerId == root.layerId && e.setTemplate && e.templateId == "ScrollView") == true) return root;
+            for (var current = root; current != null; current = tree.Find(current.parentId))
+                if (current.templateId == "ScrollView") return current;
+            return null;
         }
         static void CopyProgress(PsdNode from, PsdNode to)
         {

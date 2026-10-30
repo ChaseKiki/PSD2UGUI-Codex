@@ -153,6 +153,7 @@ namespace PsdTool
     }
 
     public enum ProgressFillMode { Auto, Horizontal, Vertical, Radial360, Radial180, Radial90 }
+    public enum ScrollLayoutMode { KeepPsd, Vertical, Horizontal }
 
     [Serializable]
     public class PsdNode
@@ -183,6 +184,9 @@ namespace PsdTool
         public bool progressReverse, progressClockwise = true;
         public int progressOrigin;
         public float progressValue = 1f;
+        public ScrollLayoutMode scrollLayout;
+        public float scrollSpacing;
+        public int scrollPaddingLeft, scrollPaddingRight, scrollPaddingTop, scrollPaddingBottom;
         public bool generateBind;
         public bool underSafeArea;
         public NineSliceOverride nineOverride;

@@ -130,6 +130,8 @@ namespace PsdTool
                 if (!horizontal && !vertical) vertical = true;
             }
             if (dropdown) { horizontal = false; vertical = true; }
+            else if (node.scrollLayout != ScrollLayoutMode.KeepPsd)
+            { vertical = node.scrollLayout == ScrollLayoutMode.Vertical; horizontal = !vertical; }
 
             Rect contentRect = viewportRect;
             if (!dropdown)
@@ -220,6 +222,7 @@ namespace PsdTool
             }
             scroll.horizontalScrollbarVisibility = ScrollRect.ScrollbarVisibility.Permanent;
             scroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.Permanent;
+            if (!dropdown) ScrollLayoutOptions.Apply(node, crt);
             // Serialize the same bounds/size that uGUI will use on its first layout.
             // Empty or short content fills the track; longer content uses view/content.
             scroll.Rebuild(CanvasUpdate.PostLayout);

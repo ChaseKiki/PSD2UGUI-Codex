@@ -47,7 +47,7 @@ namespace PsdTool
             {
                 EditorGUILayout.LabelField(state.tree.panelName + " · 识别审核", PsdEditorUI.Title);
                 EditorGUILayout.LabelField($"待处理 {pending.Length + other.Length}   ·   常规已选 {ready.Length}   ·   已应用 {state.rows.Count(r => r.applied)}", EditorStyles.wordWrappedLabel);
-                EditorGUILayout.LabelField($"本次将应用 {selected} 项建议；{errors} 项异常隔离，{state.generationIssues.Count} 项交互问题按外观生成。", EditorStyles.wordWrappedMiniLabel);
+                EditorGUILayout.LabelField($"本次将应用 {selected} 项建议；{errors} 项异常隔离，{state.generationIssues.Count(i => i.placeholder)} 项补建占位，{state.generationIssues.Count(i => !i.placeholder)} 项保留外观待绑定。", EditorStyles.wordWrappedMiniLabel);
                 if (state.preflightError != null) EditorGUILayout.HelpBox("生成前需处理：" + state.preflightError, MessageType.Warning);
                 if (!string.IsNullOrEmpty(state.error)) EditorGUILayout.HelpBox(state.error, MessageType.Error);
                 using (new EditorGUI.DisabledScope(!state.externalTask && selected == 0))
@@ -114,7 +114,7 @@ namespace PsdTool
                         else GUI.Label(rect, "暂无区域图", EditorStyles.centeredGreyMiniLabel);
                         using (new EditorGUI.DisabledScope(region == null))
                             if (GUI.Button(rect, new GUIContent("", "点击放大，并在整图中查看位置与涉及部件"), GUIStyle.none)) AiRegionPreviewWindow.Open(state, region, proposal);
-                        EditorGUILayout.LabelField("PSD 快照 · 点击定位", new GUIStyle(EditorStyles.centeredGreyMiniLabel) { wordWrap = true }, GUILayout.Width(narrow ? 76 : 104), GUILayout.Height(28));
+                        EditorGUILayout.LabelField(new GUIContent("PSD 快照 · 点击定位", "快照可能包含下拉展开态遮挡；绑定以来源图层和完整控件方案为准。"), new GUIStyle(EditorStyles.centeredGreyMiniLabel) { wordWrap = true }, GUILayout.Width(narrow ? 76 : 104), GUILayout.Height(28));
                     }
                     using (new EditorGUILayout.VerticalScope(GUILayout.Width(Mathf.Max(170, position.width - (narrow ? 76 : 258) - 64))))
                     {
@@ -163,9 +163,23 @@ namespace PsdTool
                 if (PsdEditorUI.Action("应用此方案", true)) Execute(() => state.ApplySelected(true, row));
             using (new EditorGUI.DisabledScope(state.tree.Find(id) == null))
                 if (PsdEditorUI.Action("定位节点")) PsdToolWindow.FocusNode(state.tree, state.settings, id);
+            if (result?.type == "ScrollView" && state.tree.Find(id) != null)
+            {
+                var layoutNode = state.ScrollLayoutNode(result);
+                using (new EditorGUI.DisabledScope(layoutNode == null))
+                    if (PsdEditorUI.Action("排列与自适应…"))
+                        ScrollLayoutWindow.Open(layoutNode, options => state.ConfigureScrollLayout(result, options));
+                if (layoutNode == null) EditorGUILayout.LabelField("先应用结构方案，再配置新建列表的排列。", EditorStyles.wordWrappedMiniLabel);
+            }
             if (result?.status == AiRegionStatus.Ignored)
             { if (PsdEditorUI.Action("恢复为待处理")) Execute(() => state.IgnoreRegion(result, true)); return; }
             if (result == null || !IsIssue(result)) return;
+            var owner = state.StructuralOwner(result);
+            if (owner != null)
+            {
+                EditorGUILayout.LabelField("已包含在父级结构方案中；将一起处理相关部件及独立子控件。覆盖仍保护属性锁。", EditorStyles.wordWrappedMiniLabel, GUILayout.Width(154));
+                if (PsdEditorUI.Action("应用父级完整方案", true)) Execute(() => state.ApplyOwnerRegion(result));
+            }
             if (AiProtocol.HasEdits(result.recoveryProposal))
             {
                 EditorGUILayout.LabelField("仅覆盖本条人工/PSD 决定；仍保护属性锁与结构安全。", EditorStyles.wordWrappedMiniLabel, GUILayout.Width(154));
@@ -194,7 +208,7 @@ namespace PsdTool
         {
             using (new EditorGUILayout.VerticalScope(PsdEditorUI.Card))
             {
-                EditorGUILayout.LabelField((state.generated ? "已生成外观 · " : "生成前预检 · ") + issue.nodePath, EditorStyles.boldLabel);
+                EditorGUILayout.LabelField((issue.placeholder ? state.generated ? "已补建占位 · " : "将补建占位 · " : state.generated ? "已生成外观 · " : "生成前预检 · ") + issue.nodePath, EditorStyles.boldLabel);
                 using (new EditorGUILayout.HorizontalScope())
                 {
                     var rect = GUILayoutUtility.GetRect(76, 70, GUILayout.Width(76));

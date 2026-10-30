@@ -30,7 +30,17 @@ namespace PsdTool
                 case "InputField": builder.Simple(root, "placeholder"); break;
                 case "Button": builder.Simple(root, "label"); break;
                 case "Slider": builder.Linear(root, true); break;
-                case "Progress": if (root.progressFill >= ProgressFillMode.Radial360) builder.Radial(root); else builder.Linear(root, false); break;
+                case "Progress":
+                    try { if (root.progressFill >= ProgressFillMode.Radial360) builder.Radial(root); else builder.Linear(root, false); }
+                    catch (InvalidOperationException)
+                    {
+                        // Do not discard source slots or guess among ambiguous images.
+                        // The Progress builder will supply clearly reported placeholders.
+                        builder.edits.Clear(); builder.Control(root, "Progress");
+                        builder.plan.requiresReview = true;
+                        builder.plan.reason = "进度部件不完整或无法唯一定位，保留源图层与已有插槽；缺少部件将在生成时补建占位，请验收方向与样式。";
+                    }
+                    break;
                 default: throw new InvalidOperationException("本轮区域绑定尚未支持该类型，保留原节点。");
             }
             builder.plan.nodes = builder.edits.Values.OrderBy(e => e.layerId).ToList(); return builder.plan;

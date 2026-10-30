@@ -1,5 +1,6 @@
 ﻿using UnityEngine;
 using UnityEngine.UI;
+using UnityEditor;
 using static PsdTool.PrefabGenerator;
 
 namespace PsdTool
@@ -9,6 +10,12 @@ namespace PsdTool
         public void Build(ControlBuildContext ctx, PsdNode node, GameObject root, Rect bounds)
         {
             bool interactive = node.templateId != "Progress";
+            if (!interactive && (Slot(ctx, node, "fill") == null ||
+                node.progressFill < ProgressFillMode.Radial360 && Slot(ctx, node, "track") == null && Slot(ctx, node, "bg") == null))
+            {
+                BuildIncompleteProgress(ctx, node, root, bounds);
+                return;
+            }
             if (!interactive && node.progressFill != ProgressFillMode.Auto) { BuildExplicitProgress(ctx, node, root, bounds); return; }
             CreateDecorChildren(ctx, node, root, bounds, -1, -1, "track", "fill", "handle");
             var track = Slot(ctx, node, "track") ?? Slot(ctx, node, "bg");
@@ -73,6 +80,43 @@ namespace PsdTool
             slider.targetGraphic = handleGraphic ?? (Graphic)image ?? root.AddComponent<NonDrawingGraphic>();
             slider.targetGraphic.raycastTarget = true;
             slider.SetValueWithoutNotify(value);
+        }
+        static void BuildIncompleteProgress(ControlBuildContext ctx, PsdNode node, GameObject root, Rect bounds)
+        {
+            var track = Slot(ctx, node, "track") ?? Slot(ctx, node, "bg");
+            var fill = Slot(ctx, node, "fill");
+            CreateDecorChildren(ctx, node, root, bounds, -1, -1, "track", "bg", "fill");
+            bool sourceBackground = track == null && node.kind != LayerKind.Group && node.kind != LayerKind.Text;
+            var rect = RectOf(ctx, track) ?? RectOf(ctx, fill) ?? bounds;
+            if (rect.width <= 0 || rect.height <= 0) rect = new Rect(bounds.position, new Vector2(100, 12));
+            var background = EnsureChild(root.transform, "Background", rect, bounds);
+            if (track != null) CopyImageTo(ctx, track, background);
+            else if (sourceBackground) CreateImage(ctx, node, background);
+            else background.AddComponent<Image>().color = new Color(.15f, .15f, .15f, .35f);
+            var visual = EnsureChild(root.transform, "Fill", rect, bounds);
+            if (fill != null) CopyImageTo(ctx, fill, visual);
+            var image = visual.GetComponent<Image>();
+            if (image == null && fill == null) { image = visual.AddComponent<Image>(); image.color = new Color(.25f, .7f, 1, .5f); }
+            if (image != null)
+            {
+                // Image.Filled needs a persistent sprite to render fillAmount;
+                // a sprite-less solid Image would always draw its full rectangle.
+                if (image.sprite == null) image.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/UISprite.psd");
+                image.type = Image.Type.Filled;
+                image.fillMethod = node.progressFill >= ProgressFillMode.Radial360 ?
+                    node.progressFill == ProgressFillMode.Radial90 ? Image.FillMethod.Radial90 :
+                    node.progressFill == ProgressFillMode.Radial180 ? Image.FillMethod.Radial180 : Image.FillMethod.Radial360 :
+                    node.progressFill == ProgressFillMode.Vertical || node.progressFill == ProgressFillMode.Auto && rect.height > rect.width ? Image.FillMethod.Vertical : Image.FillMethod.Horizontal;
+                image.fillOrigin = node.progressFill >= ProgressFillMode.Radial360 ? Mathf.Clamp(node.progressOrigin, 0, 3) : node.progressReverse ? 1 : 0;
+                image.fillClockwise = node.progressClockwise;
+                image.fillAmount = Mathf.Clamp01(node.progressValue);
+            }
+            foreach (var graphic in background.GetComponentsInChildren<Graphic>(true)) graphic.raycastTarget = false;
+            foreach (var graphic in visual.GetComponentsInChildren<Graphic>(true)) graphic.raycastTarget = false;
+            ctx.Repairs.Add(new GenerationIssue { layerId = node.layerId, type = "Progress", placeholder = true,
+                message = "Progress 部件不完整，已补建 " + (track == null && !sourceBackground ? "纯色 Background " : "") + (fill == null ? "纯色 Fill" : "") +
+                    (sourceBackground ? "；保留原图作为 Background" : ""),
+                resolution = "Prefab 可以继续生成。占位尺寸参考已有部件或控件范围，颜色/方向/数值需验收；生成后可在 Unity 替换占位图，无需返回 PSD。" });
         }
         static void BuildExplicitProgress(ControlBuildContext ctx, PsdNode node, GameObject root, Rect bounds)
         {

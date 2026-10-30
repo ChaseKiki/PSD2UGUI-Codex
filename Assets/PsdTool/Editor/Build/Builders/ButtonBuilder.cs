@@ -40,10 +40,13 @@ namespace PsdTool
             hit.raycastTarget = true;
             if (button.targetGraphic == null) button.targetGraphic = hit;
 
-            float scale = node.pressScale >= 0f ? node.pressScale : ctx.Settings.buttonPressScale;
-            var press = go.AddComponent<ButtonPressScale>();
-            press.pressedScale = scale;
-            press.duration = ctx.Settings.buttonPressDuration;
+            float scale = node.pressScale >= 0f ? node.pressScale : ctx.Settings.addButtonPressScale ? ctx.Settings.buttonPressScale : 1f;
+            if (scale < .999f)
+            {
+                var press = go.AddComponent<ButtonPressScale>();
+                press.pressedScale = scale;
+                press.duration = ctx.Settings.buttonPressDuration;
+            }
 
             // Do not enlarge the root after positioning the source children: that
             // shifts center-anchored artwork and creates an invisible oversized hit area.
@@ -59,7 +62,7 @@ namespace PsdTool
                 button.spriteState = state;
             }
 
-            go.AddComponent<UIGray>();
+            if (ctx.Settings.addButtonGray) go.AddComponent<UIGray>();
         }
     }
 }

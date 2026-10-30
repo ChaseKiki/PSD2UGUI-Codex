@@ -33,6 +33,7 @@ namespace PsdTool
         {
             public GameObject Root;
             public Scene Scene;
+            internal readonly List<GenerationIssue> Repairs = new List<GenerationIssue>();
             public void Dispose()
             {
                 if (Root != null) Object.DestroyImmediate(Root);
@@ -78,7 +79,9 @@ namespace PsdTool
                     if (ctx.Map.TryGetValue(node.layerId, out var mapped))
                         Stamp(mapped, sourceGuid, string.IsNullOrEmpty(node.stableKey) ? "layer:" + node.layerId : node.stableKey);
                 StampHelpers(root.transform, sourceGuid);
-                return new Draft { Root = root, Scene = previewScene };
+                var draft = new Draft { Root = root, Scene = previewScene };
+                draft.Repairs.AddRange(ctx.Repairs);
+                return draft;
             }
             catch
             {
@@ -91,6 +94,7 @@ namespace PsdTool
         internal static void Stamp(GameObject go, string source, string key)
         {
             var id = go.GetComponent<PsdGeneratedNode>() ?? go.AddComponent<PsdGeneratedNode>();
+            id.hideFlags |= HideFlags.HideInInspector;
             id.sourceGuid = source;
             id.key = key;
         }

@@ -34,6 +34,7 @@ namespace PsdTool
             {
                 dropdown.interactable = false;
                 ctx.Tree.warnings.Add("下拉“" + node.goName + "”缺少 template，已保留外观并禁用交互；请指定展开列表后重新生成。");
+                ReportDisabled(ctx, node, "缺少展开列表 template");
                 return;
             }
             var scroll = template.GetComponent<ScrollRect>();
@@ -43,6 +44,7 @@ namespace PsdTool
                 dropdown.interactable = false;
                 template.SetActive(false);
                 ctx.Tree.warnings.Add("下拉“" + node.goName + "”缺少带 Toggle 的 item，已禁用交互；请指定选项组。");
+                ReportDisabled(ctx, node, "展开列表缺少 Toggle 选项模板");
                 return;
             }
             dropdown.itemText = item.GetComponentInChildren<TMP_Text>(true);
@@ -54,6 +56,7 @@ namespace PsdTool
                 dropdown.interactable = false;
                 template.SetActive(false);
                 ctx.Tree.warnings.Add("下拉“" + node.goName + "”的 item 缺少文字和图标，已禁用交互。");
+                ReportDisabled(ctx, node, "选项缺少文字或图标");
                 return;
             }
             var options = new List<TMP_Dropdown.OptionData>();
@@ -79,6 +82,11 @@ namespace PsdTool
                 if (!graphic.transform.IsChildOf(template.transform)) graphic.raycastTarget = graphic == dropdown.targetGraphic;
         }
 
+        static void ReportDisabled(ControlBuildContext ctx, PsdNode node, string reason)
+        {
+            ctx.Repairs.Add(new GenerationIssue { layerId = node.layerId, type = "Dropdown", message = reason,
+                resolution = "已保留外观并禁用该下拉交互，其余控件继续生成。请在 Unity 指定展开列表及选项部件后重新生成。" });
+        }
         static PsdNode FindText(ControlBuildContext ctx, PsdNode parent)
         {
             foreach (var child in ctx.ChildrenOf(parent.layerId))

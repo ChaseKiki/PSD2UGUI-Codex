@@ -18,6 +18,7 @@ namespace PsdTool
         public readonly HashSet<string> MissingFonts = new HashSet<string>();
         public readonly HashSet<int> DropdownTemplates = new HashSet<int>();
         public readonly HashSet<int> DropdownItems = new HashSet<int>();
+        public readonly List<GenerationIssue> Repairs = new List<GenerationIssue>();
 
         public ControlBuildContext(PsdTree tree, PsdToolSettings settings)
         {
