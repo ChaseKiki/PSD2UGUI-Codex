@@ -72,3 +72,20 @@ Runtime code/layout must update Content dimensions when items change so ScrollRe
 **MIT License:** free use, modification, distribution, commercial use and integration into closed-source projects are permitted. **Retain the copyright and complete permission notice** when distributing the software or substantial portions of it. Provided as-is, without warranty. See [LICENSE](LICENSE), [third-party notices](THIRD_PARTY_NOTICES.md) and [contributing notes](CONTRIBUTING.md).
 
 This independently maintained project is not affiliated with Unity, Adobe or OpenAI.
+
+## Optional support
+
+If this tool saves you repetitive work, you can support its continued maintenance on [Ko-fi](https://ko-fi.com/chasekiki) or through WeChat.
+
+**Support is entirely voluntary. All features and MIT license rights remain available whether or not you contribute. A tip does not purchase features, priority handling or guaranteed response times.** This is a personally maintained project; bug reports, documentation improvements and sharing your experience are equally appreciated.
+
+<details>
+<summary>WeChat appreciation code (click to expand)</summary>
+
+Scan using WeChat. Click the image to open the original.
+
+<a href="docs/support/wechat-support.jpg"><img src="docs/support/wechat-support.jpg" alt="ChaseKiki WeChat appreciation code" width="320"></a>
+
+</details>
+
+The repository's Sponsor button also links to [Ko-fi](https://ko-fi.com/chasekiki) and the [support page](docs/support/README.md).

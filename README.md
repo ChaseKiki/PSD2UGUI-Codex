@@ -97,3 +97,20 @@
 本项目使用 **MIT License**，允许免费使用、修改、分发、商用，以及用于闭源项目；分发软件或其重要部分时，**必须保留版权声明和完整许可声明**。软件按现状提供，无担保。详见 [LICENSE](LICENSE)。
 
 第三方软件、服务及其商标不因此获得本项目的授权；依赖说明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。本项目与 Unity、Adobe、OpenAI 无官方隶属关系。
+
+## 自愿赞赏
+
+如果这个工具帮你减少了重复工作，欢迎通过 [Ko-fi](https://ko-fi.com/chasekiki) 或微信赞赏支持后续维护。
+
+**赞赏完全自愿，是否赞赏不影响任何功能使用或 MIT 许可权利。赞赏不等同于购买功能、优先处理或即时回复；项目由个人维护。** 反馈问题、完善文档和分享使用经验，同样是支持。
+
+<details>
+<summary>微信赞赏码（点击展开）</summary>
+
+使用微信扫一扫；点击图片可查看原图。
+
+<a href="docs/support/wechat-support.jpg"><img src="docs/support/wechat-support.jpg" alt="ChaseKiki 微信赞赏码" width="320"></a>
+
+</details>
+
+仓库顶部的 Sponsor 按钮也提供 [Ko-fi](https://ko-fi.com/chasekiki) 和[赞赏说明页](docs/support/README.md)入口。
