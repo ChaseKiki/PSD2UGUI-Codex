@@ -4,7 +4,8 @@ using UnityEngine.EventSystems;
 
 namespace PsdTool
 {
-    /// <summary>按下缩放反馈。挂在带 Button 的节点上；UGUI 自带 Transition 不含缩放。</summary>
+    /// <summary>旧 Prefab 引用兼容。新生成按钮不再添加此组件，改用原生 ColorTint。</summary>
+    [AddComponentMenu("")]
     public sealed class ButtonPressScale : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, IPointerExitHandler
     {
         [Range(0.5f, 1f)] public float pressedScale = 0.95f;

@@ -4,9 +4,9 @@
 
 **Turn layered Photoshop designs into editable Unity uGUI prefabs, with Codex-assisted recognition, grouping and component binding.**
 
-Ordinary layer names, including Chinese names, are supported. Current release: **Preview**, internal version `2026.10.30-preview.12`. Review generated layouts and interactions before using them in production.
+Ordinary layer names, including Chinese names, are supported. Current release: **Preview**, internal version `2026.11.03-preview.13`. Review generated layouts and interactions before using them in production.
 
-- [Download the Unity package](Releases/preview.12/PsdTool-2026.10.30-preview.12.unitypackage)
+- [Download the Unity package](Releases/preview.13/PsdTool-2026.11.03-preview.13.unitypackage)
 - [English user guide](Assets/PsdTool/Documentation/UserGuide.en.md)
 - [Chinese user guide](Assets/PsdTool/Documentation/使用说明.md)
 - [MIT License](LICENSE)
@@ -33,11 +33,11 @@ The need comes from repetitive work across design handoff and iteration. AI reco
 - Use visual bounds for button hit areas and native ScrollRect view/content proportions for scrollbar handles. Progress supports manually configured linear or radial fill.
 - Optionally bake image-layer FX through a temporary Photoshop document. Text stays editable through TMP, with partial effect approximation.
 
-## Preview.12 changes
+## Preview.13 changes
 
-- Optional per-ScrollView native layout and sizing; PSD positioning remains the default.
-- Optional button behaviours are off by default, identity markers are hidden, and clean-copy export protects required components and event references.
-- Reported placeholders recover incomplete progress controls; complete parent plans remain actionable, and expanded dropdown occlusion is evaluated with source-layer evidence.
+- Manually select multiple images, text layers or groups to define a Button hit area without moving artwork.
+- Buttons use native ColorTint and the largest visible Image as TargetGraphic. Press-scaling and SpriteSwap generation are removed; managed old buttons migrate with lock and reference protection.
+- Nine-slicing only sets Sprite Border / Image.Sliced, preserving exported image dimensions and pixels. Android/iOS compression, atlas profiles and external-image protection remain available.
 
 ## Requirements
 
@@ -73,7 +73,7 @@ Runtime code/layout must update Content dimensions when items change so ScrollRe
 
 ## Source and license
 
-`Assets/PsdTool` contains Editor code, Runtime helpers, Photoshop scripts, the recognition skill and documentation. `Releases/preview.12` contains the verified installer and checksum. Project data, commercial artwork, fonts, local settings and internal test fixtures are excluded.
+`Assets/PsdTool` contains Editor code, Runtime helpers, Photoshop scripts, the recognition skill and documentation. `Releases/preview.13` contains the verified installer and checksum. Project data, commercial artwork, fonts, local settings and internal test fixtures are excluded.
 
 **MIT License:** free use, modification, distribution, commercial use and integration into closed-source projects are permitted. **Retain the copyright and complete permission notice** when distributing the software or substantial portions of it. Provided as-is, without warranty. See [LICENSE](LICENSE), [third-party notices](THIRD_PARTY_NOTICES.md) and [contributing notes](CONTRIBUTING.md).
 

@@ -170,11 +170,7 @@ namespace PsdTool
 
                 if (NineSlice.Try(cropped, sw, sh, forceNine ? nineArg ?? string.Empty : null, out var slice))
                 {
-                    spritePixels = slice.pixels;
-                    sw = slice.width;
-                    sh = slice.height;
                     border = slice.border;
-                    tiled = slice.tiled || tiled;
                     sliced = !tiled;
                     if (!string.IsNullOrEmpty(slice.warning)) tree.warnings.Add($"“{node.goName}”{slice.warning}");
                 }

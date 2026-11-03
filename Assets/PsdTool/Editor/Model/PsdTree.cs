@@ -195,6 +195,9 @@ namespace PsdTool
         /// <summary>-1 表示使用设置默认值。</summary>
         public float pressScale = -1f;
 
+        /// <summary>空列表使用全部正常视觉；否则使用所选节点的稳定标识计算按钮热区。</summary>
+        public List<string> buttonHitKeys = new List<string>();
+
         /// <summary>PSD 图层记录中的像素边界（不含图层样式效果）。</summary>
         public RectInt psdRect;
         public bool visible = true;

@@ -23,44 +23,45 @@ namespace PsdTool
             CreateVisualChildren(ctx, node, go, rootRect);
 
             var button = go.AddComponent<Button>();
-            button.transition = Selectable.Transition.None;
+            button.transition = Selectable.Transition.ColorTint;
+            var colors = ColorBlock.defaultColorBlock;
+            colors.highlightedColor = new Color(.9f, .9f, .9f, 1f);
+            colors.pressedColor = new Color(.7f, .7f, .7f, 1f);
+            colors.selectedColor = new Color(.95f, .95f, .95f, 1f);
+            button.colors = colors;
             button.navigation = new Navigation { mode = Navigation.Mode.None };
 
-            var bg = Slot(ctx, node, "bg");
-            Graphic target = null;
-            if (bg != null && ctx.Map.TryGetValue(bg.layerId, out var bgGo))
-                target = bgGo.GetComponent<Graphic>();
-            if (target == null) target = go.GetComponentInChildren<Graphic>();
+            Image target = null;
+            float largest = -1;
+            var corners = new Vector3[4];
+            foreach (var image in go.GetComponentsInChildren<Image>(true))
+            {
+                bool visible = image.enabled && image.color.a > 0;
+                for (var t = image.transform; t != null; t = t.parent)
+                {
+                    if (!t.gameObject.activeSelf) visible = false;
+                    foreach (var sourceNode in ctx.Tree.nodes)
+                        if (IsStateSlot(sourceNode.slot) && ctx.Map.TryGetValue(sourceNode.layerId, out var stateGo) && stateGo.transform == t) visible = false;
+                    if (t == go.transform) break;
+                }
+                if (!visible) continue;
+                image.rectTransform.GetWorldCorners(corners);
+                float area = Vector3.Cross(corners[1] - corners[0], corners[3] - corners[0]).magnitude;
+                if (area > largest) { largest = area; target = image; }
+            }
             button.targetGraphic = target;
 
             foreach (var g in go.GetComponentsInChildren<Graphic>(true))
-                g.raycastTarget = g == target;
+                g.raycastTarget = false;
             // 根热区覆盖全部视觉范围，适用于纯图标、多层背景和主副标题按钮。
             var hit = go.GetComponent<NonDrawingGraphic>() ?? go.AddComponent<NonDrawingGraphic>();
             hit.raycastTarget = true;
             if (button.targetGraphic == null) button.targetGraphic = hit;
 
-            float scale = node.pressScale >= 0f ? node.pressScale : ctx.Settings.addButtonPressScale ? ctx.Settings.buttonPressScale : 1f;
-            if (scale < .999f)
-            {
-                var press = go.AddComponent<ButtonPressScale>();
-                press.pressedScale = scale;
-                press.duration = ctx.Settings.buttonPressDuration;
-            }
-
             // Do not enlarge the root after positioning the source children: that
             // shifts center-anchored artwork and creates an invisible oversized hit area.
 
-            var pressed = Slot(ctx, node, "pressed");
-            var disabled = Slot(ctx, node, "disabled");
-            if (pressed != null || disabled != null)
-            {
-                button.transition = Selectable.Transition.SpriteSwap;
-                var state = button.spriteState;
-                if (pressed != null) state.pressedSprite = LoadSprite(pressed);
-                if (disabled != null) state.disabledSprite = LoadSprite(disabled);
-                button.spriteState = state;
-            }
+            button.spriteState = default;
 
             if (ctx.Settings.addButtonGray) go.AddComponent<UIGray>();
         }

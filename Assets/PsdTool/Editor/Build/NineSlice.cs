@@ -18,8 +18,8 @@ namespace PsdTool
     }
 
     /// <summary>
-    /// 九宫格与平铺识别。先找可拉伸的纯色（容差内）行列，再找周期性重复。
-    /// 结果用拉伸回原尺寸的逐像素误差回验，超标则放弃。
+    /// 只识别九宫边框，不改变源像素及尺寸，不自动抽取重复纹理。
+    /// 候选可拉伸区域用逐像素误差回验，超标则放弃。
     /// </summary>
     public static class NineSlice
     {
@@ -98,16 +98,6 @@ namespace PsdTool
                     false, false, out result))
                 return true;
 
-            var colHash = Hashes(src, w, h, true);
-            var rowHash = Hashes(src, w, h, false);
-            bool px = TryPeriod(w, (a, b) => colHash[a] == colHash[b], out int cs, out int cp, out int crun);
-            bool py = TryPeriod(h, (a, b) => rowHash[a] == rowHash[b], out int rs, out int rp, out int rrun);
-            if ((px || py) && Build(src, w, h,
-                    px ? Axis.Tile(w, cs, cp, crun) : Axis.Identity(w),
-                    py ? Axis.Tile(h, rs, rp, rrun) : Axis.Identity(h),
-                    true, false, out result))
-                return true;
-
             result = default;
             return false;
         }
@@ -135,11 +125,11 @@ namespace PsdTool
 
             result = new NineSliceResult
             {
-                pixels = dst,
-                width = mw,
-                height = mh,
+                pixels = src,
+                width = w,
+                height = h,
                 border = new Vector4(ax.cap0, ay.cap1, ax.cap1, ay.cap0),
-                tiled = tiled,
+                tiled = false,
                 avgError = avg,
                 maxError = max,
                 warning = pass ? null : $"九宫回验误差偏大（平均 {avg:0.##}，最大 {max}），仍按标记使用",

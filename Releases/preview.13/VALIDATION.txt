@@ -1,0 +1,10 @@
+Unity 2022.3.62f3c1 / Windows
+PASS: explicit/nested/invalid button hit-area source bounds; no moved artwork.
+PASS: largest normal Image ColorTint, no generated press-scale component.
+PASS: legacy migration, referenced/locked component protection, Button GUID/FileID and no-op stability.
+PASS: full PSD pixel-channel export with unchanged PNG pixels and dimensions; border-only changes retain PNG bytes and GUID.
+PASS: incremental import, resource reuse, atlas/platform profiles, component bindings and Play interactions.
+PASS: optional ScrollView layouts and clean-copy export with retained events.
+PASS: fresh-project package import, product manifest, menus, clean defaults, TMP essentials.
+Package excludes tests, project settings assets, source PSDs, generated UI, import state and credentials.
+No new AI model-accuracy benchmark or Photoshop compatibility test was performed for this release.

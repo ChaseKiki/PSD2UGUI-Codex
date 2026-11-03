@@ -460,14 +460,9 @@ namespace PsdTool
 
                 if (n.templateId == "Button")
                 {
-                    float scale = n.pressScale < 0f ? _settings.addButtonPressScale ? _settings.buttonPressScale : 1f : n.pressScale;
-                    bool enabled = scale < .999f;
-                    bool nextEnabled = EditorGUILayout.Toggle("启用按压缩放", enabled);
-                    if (nextEnabled != enabled) { n.pressScale = scale = nextEnabled ? _settings.buttonPressScale : 1f; }
-                    EditorGUI.BeginChangeCheck();
-                    using (new EditorGUI.DisabledScope(!nextEnabled)) scale = EditorGUILayout.Slider("按下缩放", scale, 0.5f, 1f);
-                    if (EditorGUI.EndChangeCheck()) n.pressScale = scale;
-                    if (GUILayout.Button("恢复默认缩放", GUILayout.Width(120))) n.pressScale = -1f;
+                    EditorGUILayout.LabelField("按钮反馈", "ColorTint / 最大可见 Image");
+                    if (GUILayout.Button("选择按钮热区来源…")) ButtonHitSourcesWindow.Open(_tree, n);
+                    EditorGUILayout.LabelField("热区范围", n.buttonHitKeys == null || n.buttonHitKeys.Count == 0 ? "全部正常视觉（默认）" : "已选择 " + n.buttonHitKeys.Count + " 个来源");
                 }
 
                 if (EditorGUI.EndChangeCheck())

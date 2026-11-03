@@ -276,6 +276,17 @@ namespace PsdTool
                     foreach (var component in before.components)
                         if (!Components(pair.Value).ContainsKey(component.type) && FindComponent(target, component.type) != null)
                         {
+                            if (FindComponent(target, component.type) is ButtonPressScale legacyScale && owner?.templateId == "Button" && !IsLocked(owner, PropGroup.Component))
+                            {
+                                if (!LegacyButtonMigration.Referenced(legacyScale, target.transform.root.gameObject, AssetDatabase.GUIDToAssetPath(tree.prefabGuid)))
+                                {
+                                    Object.DestroyImmediate(legacyScale); report.changed = true;
+                                    report.lines.Add("移除旧版工具按钮缩放组件：" + target.name);
+                                    continue;
+                                }
+                                report.lines.Add("需人工复核：旧按钮缩放组件存在事件/脚本或外部资源引用，已保留兼容：" + target.name);
+                                continue;
+                            }
                             report.lines.Add("待删除组件（已保留）：" + target.name + "/" + component.type.Split(',')[0]);
                             report.removals.Add(new Removal { key = pair.Key, component = component.type, label = target.name + "/" + component.type.Split(',')[0] });
                             var obsolete = FindComponent(target, component.type);
@@ -314,6 +325,9 @@ namespace PsdTool
                         var last = prior?.properties.Find(x => x.path == p.propertyPath);
                         bool newlyGenerated = added.Contains(pair.Key) || addedComponents.Contains(pair.Key + "|" + c.Key);
                         bool manuallyChanged = !newlyGenerated && (last != null ? actual != last.value : true);
+                        // 已接管且未锁定的 Button 统一迁移反馈策略，事件仍由上面的属性过滤保护。
+                        if (c.Value is UnityEngine.UI.Button && owner?.templateId == "Button" && prior != null &&
+                            (p.propertyPath == "m_Transition" || p.propertyPath == "m_Colors" || p.propertyPath == "m_SpriteState" || p.propertyPath == "m_TargetGraphic")) manuallyChanged = false;
                         if (IsLocked(owner, group) || (!Force(owner, group) && manuallyChanged))
                         { Preserve(owner, group, target.name + "/" + c.Value.GetType().Name + "/" + p.propertyPath, locks, report); continue; }
                         dst.CopyFromSerializedProperty(p);

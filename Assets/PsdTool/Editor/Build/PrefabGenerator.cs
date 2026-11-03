@@ -127,6 +127,13 @@ namespace PsdTool
             if (node == null) return null;
             if (ctx.Rects.TryGetValue(node.layerId, out var cached)) return cached;
 
+            if (node.templateId == "Button" && node.buttonHitKeys != null && node.buttonHitKeys.Count > 0)
+            {
+                var selected = ButtonHitSources.Bounds(ctx, node);
+                if (selected.HasValue) { ctx.Rects[node.layerId] = selected; return selected; }
+                ctx.Tree.warnings.Add("按钮“" + node.goName + "”的热区来源已失效或没有可见内容，暂用全部正常视觉范围；请重新选择热区来源。");
+            }
+
             Rect? result = null;
             switch (node.kind)
             {
