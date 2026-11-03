@@ -35,6 +35,7 @@ namespace PsdTool
         Force,
         Forbid,
     }
+    public enum NineShrinkDecision { Unreviewed, KeepOriginal, Shrink }
 
     [Flags]
     public enum PropGroup
@@ -170,6 +171,9 @@ namespace PsdTool
         public int order;
         public string psdName;
         public string goName;
+        public string englishNameHint;
+        public bool manualName, nameReviewed;
+        public string nameReviewStructure;
 
         public LayerKind kind;
         public string templateId;
@@ -191,12 +195,16 @@ namespace PsdTool
         public bool underSafeArea;
         public NineSliceOverride nineOverride;
         public Vector4 nineBorder;
+        public NineShrinkDecision nineShrinkDecision;
+        public string nineShrinkDecisionHash;
 
         /// <summary>-1 表示使用设置默认值。</summary>
         public float pressScale = -1f;
 
         /// <summary>空列表使用全部正常视觉；否则使用所选节点的稳定标识计算按钮热区。</summary>
         public List<string> buttonHitKeys = new List<string>();
+        public bool buttonColorTint;
+        public bool buttonFeedbackConfirmed;
 
         /// <summary>PSD 图层记录中的像素边界（不含图层样式效果）。</summary>
         public RectInt psdRect;

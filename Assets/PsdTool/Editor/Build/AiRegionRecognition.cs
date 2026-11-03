@@ -104,10 +104,10 @@ namespace PsdTool
                     entry.recoveryProposal = proposal;
                     if (settings != null && !AiPlanEngine.Validate(tree, settings, proposal, out string validationError))
                         throw new InvalidOperationException(validationError);
-                    if (proposal.nodes.Any(n => consumed.ContainsKey(n.layerId))) throw new InvalidOperationException("与父区域方案重叠，保留待确认。");
+                    if (proposal.nodes.Any(n => n != null && (n.setTemplate || n.setSlot || n.setParent) && consumed.ContainsKey(n.layerId))) throw new InvalidOperationException("与父区域方案重叠，保留待确认。");
                     entry.status = AiRegionStatus.Ready; entry.proposalIndex = result.controls.Count;
                     result.controls.Add(proposal);
-                    foreach (var node in proposal.nodes) consumed[node.layerId] = region.rootId;
+                    foreach (var node in proposal.nodes.Where(n => n != null && (n.setTemplate || n.setSlot || n.setParent))) consumed[node.layerId] = region.rootId;
                     consumed[region.rootId] = region.rootId;
                 }
                 catch (Exception e) { entry.status = e.Message.StartsWith("暂不支持", StringComparison.Ordinal) ? AiRegionStatus.Unsupported : AiRegionStatus.Failed; entry.message = region.error = e.Message; }

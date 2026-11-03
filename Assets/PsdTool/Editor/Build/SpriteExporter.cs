@@ -104,24 +104,9 @@ namespace PsdTool
             info.fxBaked = false;
             info.logicalRect = LogicalBounds(layer);
             info.renderOpacity = node.opacity;
-            RectInt bounds;
-            Color32[] pixels;
-            if (baked.TryGetValue(layer.Id, out var fx))
-            {
-                pixels = ReadBakedPixels(fx);
-                bounds = new RectInt(fx.x, fx.y, fx.width, fx.height);
-                info.fxBaked = true;
-                info.renderOpacity = layer.Opacity / 255f;
-            }
-            else if (Markers.Has(node.markers, "merge"))
-            {
-                pixels = MergeGroup(reader, layer, out bounds);
-            }
-            else
-            {
-                pixels = reader.DecodeLayer(layer);
-                bounds = layer.Bounds;
-            }
+            var pixels=SourcePixels(reader,layer,node,baked,out RectInt bounds,out bool fxBaked);
+            info.fxBaked=fxBaked;
+            if(fxBaked)info.renderOpacity=layer.Opacity/255f;
 
             var opaque = pixels == null ? new RectInt() : PixelUtil.OpaqueBounds(pixels, bounds.width, bounds.height);
             if (opaque.width == 0 || opaque.height == 0)
@@ -144,13 +129,7 @@ namespace PsdTool
                 return;
             }
 
-            bool raw = Markers.Has(node.markers, "raw")
-                       || opaque.width > settings.largeImageThreshold
-                       || opaque.height > settings.largeImageThreshold;
-            string ownedPath = AssetDatabase.GUIDToAssetPath(node.generatedAssetGuid ?? "");
-            if (catalog.IsOwner(node.generatedAssetGuid, ResourceCatalog.Source(tree), ResourceCatalog.Key(node)) &&
-                AssetImporter.GetAtPath(ownedPath) is TextureImporter ownedImporter && !Markers.Has(node.markers, "raw"))
-                raw = ownedImporter.textureType != TextureImporterType.Sprite;
+            bool raw=IsRaw(tree,node,settings,catalog,opaque.width,opaque.height);
             var spritePixels = cropped;
             int sw = opaque.width, sh = opaque.height;
             Vector4 border = Vector4.zero;
@@ -184,13 +163,21 @@ namespace PsdTool
                     tree.warnings.Add($"动态拉伸图片“{node.goName}”的 FX 九宫回验未通过，保留整图；请指定强制九宫边框或引用已设置九宫的 Sprite 后检查拉伸效果。");
             }
 
+            bool shrinkApplied=false;
+            if(node.nineShrinkDecision==NineShrinkDecision.Shrink)
+            {
+                if(NineShrinkReview.TryCandidate(tree,node,settings,catalog,cropped,sw,sh,info.fxBaked,out var compact,out string fingerprint)&&fingerprint==node.nineShrinkDecisionHash)
+                {spritePixels=compact.pixels;sw=compact.width;sh=compact.height;border=compact.border;sliced=true;shrinkApplied=true;}
+                else tree.warnings.Add("“"+node.goName+"”的九宫缩图确认已过期或不再适用；本次保留完整尺寸，请在工作台重新分析确认。");
+            }
+
             long hash = PixelUtil.Hash(spritePixels, sw, sh);
             string folder = Markers.Has(node.markers, "common") ? (raw ? settings.commonTextures : commonDir) : raw ? textureDir : spriteDir;
             string ownPath = $"{folder}/{PathUtil.SanitizeFileName(tree.panelName)}_{node.layerId}.png";
             string localPath = $"{(raw ? textureDir : spriteDir)}/{PathUtil.SanitizeFileName(tree.panelName)}_{node.layerId}.png";
             GeneratedResourceStore.AdoptLegacy(catalog, tree, node, ownPath);
 
-            if (GeneratedResourceStore.RetainBinding(node, hash, Markers.Has(node.markers, "raw"), forceNine || forbidNine, border, Markers.Has(node.markers, "tile")))
+            if (GeneratedResourceStore.RetainBinding(node, hash, Markers.Has(node.markers, "raw"), forceNine || forbidNine || shrinkApplied, border, Markers.Has(node.markers, "tile")))
             {
                 written[ResourceKey(hash, !node.image.useRawImage, node.image.border, node.image.tiled)] = node;
                 return;
@@ -283,6 +270,21 @@ namespace PsdTool
                 node = node,
                 pixelHash = hash,
             });
+        }
+
+        internal static Color32[] SourcePixels(PsdPixelReader reader,PsdLayer layer,PsdNode node,Dictionary<int,PhotoshopFxBaker.Entry> baked,out RectInt bounds,out bool fxBaked)
+        {
+            fxBaked=false;
+            if(baked.TryGetValue(layer.Id,out var fx)){bounds=new RectInt(fx.x,fx.y,fx.width,fx.height);fxBaked=true;return ReadBakedPixels(fx);}
+            if(Markers.Has(node.markers,"merge"))return MergeGroup(reader,layer,out bounds);
+            bounds=layer.Bounds;return reader.DecodeLayer(layer);
+        }
+        internal static bool IsRaw(PsdTree tree,PsdNode node,PsdToolSettings settings,ResourceCatalog catalog,int width,int height)
+        {
+            bool raw=Markers.Has(node.markers,"raw")||width>settings.largeImageThreshold||height>settings.largeImageThreshold;
+            string path=AssetDatabase.GUIDToAssetPath(node.generatedAssetGuid??"");
+            if(catalog!=null&&catalog.IsOwner(node.generatedAssetGuid,ResourceCatalog.Source(tree),ResourceCatalog.Key(node))&&AssetImporter.GetAtPath(path) is TextureImporter importer&&!Markers.Has(node.markers,"raw"))raw=importer.textureType!=TextureImporterType.Sprite;
+            return raw;
         }
 
         static string ResourceKey(long hash, bool sprite, Vector4 border, bool tiled) =>

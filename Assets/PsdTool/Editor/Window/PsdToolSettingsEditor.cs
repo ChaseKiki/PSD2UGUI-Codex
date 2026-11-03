@@ -20,7 +20,7 @@ namespace PsdTool
             Group(ref photoshop, "Photoshop 与图片效果", "bakeImageEffects", "photoshopTimeoutSeconds");
             if (photoshop)
             {
-                EditorGUILayout.LabelField("Photoshop（仅本机）", EditorStyles.miniLabel);
+                PsdEditorUI.Text("Photoshop（仅本机）", EditorStyles.miniLabel);
                 EditorGUILayout.SelectableLabel(PhotoshopFxBaker.ResolveExecutable(), GUILayout.Height(18));
                 if (PsdEditorUI.Action("选择 Photoshop.exe"))
                 {
@@ -34,7 +34,7 @@ namespace PsdTool
         {
             using (new EditorGUILayout.VerticalScope(PsdEditorUI.Card))
             {
-                open = EditorGUILayout.Foldout(open, heading, true);
+                open = PsdEditorUI.CopyFoldout(open, heading, true);
                 if (!open) return;
                 foreach (string name in names)
                 {

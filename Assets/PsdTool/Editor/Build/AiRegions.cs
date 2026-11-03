@@ -57,6 +57,19 @@ namespace PsdTool
             if (result.Count > 100) throw new InvalidOperationException("候选控件区域超过 100 个，请按界面拆分 PSD；不会静默漏掉区域。");
             return result;
         }
+        internal static AiRegion Focus(PsdTree tree, int id, Color32[] composite, int width, int height, int maxSide)
+        {
+            AiPlanEngine.CheckParents(tree);
+            var node = tree.Find(id);
+            if (node == null || node.status == NodeStatus.PendingDelete) throw new InvalidOperationException("指定节点不存在或待删除。");
+            var b = Bounds(tree, node);
+            int x = Mathf.Clamp(Mathf.FloorToInt(b.xMin) - 4, 0, width), y = Mathf.Clamp(Mathf.FloorToInt(b.yMin) - 4, 0, height);
+            int right = Mathf.Clamp(Mathf.CeilToInt(b.xMax) + 4, 0, width), bottom = Mathf.Clamp(Mathf.CeilToInt(b.yMax) + 4, 0, height);
+            if (right <= x || bottom <= y) throw new InvalidOperationException("该节点没有画布内的可识别区域，请选择它的父组。");
+            var rect = new RectInt(x, y, right - x, bottom - y);
+            return new AiRegion { rootId = id, rect = rect,
+                image = AiVisualInput.EncodeFit(PixelUtil.Crop(composite, width, rect), rect.width, rect.height, Mathf.Clamp(maxSide, 512, 1536)) };
+        }
         internal static int Depth(PsdTree tree, int id)
         {
             int depth = 0;

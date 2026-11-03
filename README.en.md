@@ -4,9 +4,9 @@
 
 **Turn layered Photoshop designs into editable Unity uGUI prefabs, with Codex-assisted recognition, grouping and component binding.**
 
-Ordinary layer names, including Chinese names, are supported. Current release: **Preview**, internal version `2026.11.03-preview.13`. Review generated layouts and interactions before using them in production.
+Ordinary layer names, including Chinese names, are supported. Current release: **Preview**, internal version `2026.11.03-preview.14`. Review generated layouts and interactions before using them in production.
 
-- [Download the Unity package](Releases/preview.13/PsdTool-2026.11.03-preview.13.unitypackage)
+- [Download the Unity package](Releases/preview.14/PsdTool-2026.11.03-preview.14.unitypackage)
 - [English user guide](Assets/PsdTool/Documentation/UserGuide.en.md)
 - [Chinese user guide](Assets/PsdTool/Documentation/使用说明.md)
 - [MIT License](LICENSE)
@@ -33,11 +33,12 @@ The need comes from repetitive work across design handoff and iteration. AI reco
 - Use visual bounds for button hit areas and native ScrollRect view/content proportions for scrollbar handles. Progress supports manually configured linear or radial fill.
 - Optionally bake image-layer FX through a temporary Photoshop document. Text stays editable through TMP, with partial effect approximation.
 
-## Preview.13 changes
+## Preview.14 changes
 
-- Manually select multiple images, text layers or groups to define a Button hit area without moving artwork.
-- Buttons use native ColorTint and the largest visible Image as TargetGraphic. Press-scaling and SpriteSwap generation are removed; managed old buttons migrate with lock and reference protection.
-- Nine-slicing only sets Sprite Border / Image.Sliced, preserving exported image dimensions and pixels. Android/iOS compression, atlas profiles and external-image protection remain available.
+- One workbench for Codex progress, recognition, naming and batch omission reviews.
+- Per-node naming approval, structural invalidation, preview-to-node location, Prefab/Scene selection linking and copyable text.
+- Buttons default to None and confirm optional ColorTint before generation, with bulk enable/disable and existing identity/reference/lock protections.
+- Border-only nine-slicing remains the default; explicitly approved shrinking includes reconstruction and size comparisons, without claiming measured final-build savings.
 
 ## Requirements
 

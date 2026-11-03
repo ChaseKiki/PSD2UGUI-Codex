@@ -45,8 +45,11 @@ namespace PsdTool
                 var touched = new HashSet<int>();
                 foreach (var proposal in proposals)
                 {
-                    foreach (var node in proposal.nodes ?? new List<AiNodeEdit>())
+                    foreach (var node in (proposal.nodes ?? new List<AiNodeEdit>()).Where(n => n == null || n.setTemplate || n.setSlot || n.setParent))
+                    {
+                        if (node == null) throw new InvalidOperationException("计划包含空节点。");
                         if (!touched.Add(node.layerId)) throw new InvalidOperationException("多个控件计划重复修改图层 " + node.layerId + "，请分开检查。");
+                    }
                     Edit(copy, settings, proposal, confirmed); CheckBuild(copy, settings, proposal);
                 }
                 Undo.RegisterCompleteObjectUndo(tree, "AI 识别控件与分组");
@@ -65,7 +68,12 @@ namespace PsdTool
         {
             if (proposal == null || float.IsNaN(proposal.confidence) || float.IsInfinity(proposal.confidence) || proposal.confidence < 0 || proposal.confidence > 1)
                 throw new InvalidOperationException("AI 置信度无效。");
-            var edits = proposal.nodes ?? new List<AiNodeEdit>(); var groups = proposal.groups ?? new List<AiGroupEdit>();
+            // Models sometimes include unchanged context nodes with all flags false.
+            // These are not writes and must not invalidate otherwise executable plans.
+            var rawEdits = proposal.nodes ?? new List<AiNodeEdit>();
+            if (rawEdits.Count > 256) throw new InvalidOperationException("控件计划超过数量限制。");
+            var edits = rawEdits.Where(n => n == null || n.setTemplate || n.setSlot || n.setParent).ToList();
+            var groups = proposal.groups ?? new List<AiGroupEdit>();
             var opacity = tree.nodes.Where(n => n.status != NodeStatus.PendingDelete).ToDictionary(n => n.layerId, n => ParentOpacity(tree, n));
             var inheritance = tree.nodes.Where(n => n.status != NodeStatus.PendingDelete).ToDictionary(n => n.layerId, n => VisualAncestors(tree, n));
             if (edits.Count + groups.Count == 0 || edits.Count > 256 || groups.Count > 64) throw new InvalidOperationException("控件计划为空或超过数量限制。");
@@ -93,7 +101,7 @@ namespace PsdTool
                 while (tree.Find(id) != null) id--;
                 map[group.groupId] = id;
                 tree.nodes.Add(new PsdNode { layerId = id, stableKey = key, kind = LayerKind.Group, aiGeneratedGroup = true,
-                    goName = GeneratedGroupName(group, key),
+                    goName = GeneratedGroupName(group, key), englishNameHint = NodeNaming.ValidToken(group.name) ? group.name : null,
                     psdName = "AI Group", status = NodeStatus.New, source = confirmed ? DecisionSource.Manual : DecisionSource.AI, confidence = proposal.confidence });
             }
             foreach (var group in groups)
@@ -113,7 +121,6 @@ namespace PsdTool
             {
                 var node = tree.Find(edit.layerId);
                 if (node == null || node.status == NodeStatus.PendingDelete) throw new InvalidOperationException("AI 引用了不存在或待删除的图层 " + edit.layerId);
-                if (!edit.setTemplate && !edit.setSlot && !edit.setParent) throw new InvalidOperationException("AI 节点操作没有指定要修改的字段。");
                 int parent = edit.setParent ? Resolve(edit.parentId, map) : node.parentId;
                 bool changes = edit.setTemplate && node.templateId != (edit.templateId ?? "") || edit.setSlot && node.slot != (edit.slot ?? "") || edit.setParent && node.parentId != parent;
                 if (changes && AiProtocol.Protected(node) && !(proposal.manualOverride?.Contains(node.layerId) ?? false)) throw new InvalidOperationException("“" + node.goName + "”由人工或 PSD 标记确定，AI 不会覆盖。");
@@ -223,7 +230,7 @@ namespace PsdTool
             var validation = Object.Instantiate(tree);
             try
             {
-                var affected = new HashSet<int>(proposal.nodes.Select(n => n.layerId));
+                var affected = new HashSet<int>((proposal.nodes ?? new List<AiNodeEdit>()).Where(n => n != null && (n.setTemplate || n.setSlot || n.setParent)).Select(n => n.layerId));
                 // 新组必有来源成员；下方沿这些成员向上收集本方案的控件祖先。
                 // 不把历史所有 AI 组纳入，否则一个无关坏组会拖累其它区域。
                 foreach (int id in affected.ToArray())

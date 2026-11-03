@@ -46,6 +46,7 @@ namespace PsdTool
         static Report Run(GameObject draft, PsdTree tree, PsdToolSettings settings, bool save, out GameObject prefab)
         {
             var report = new Report();
+            LegacyButtonMigration.BeginPass();
             string source = Source(tree);
             string statePath = StatePath(tree, settings);
             var state = AssetDatabase.LoadAssetAtPath<PsdImportState>(statePath);
@@ -253,6 +254,15 @@ namespace PsdTool
             {
                 if (!current.TryGetValue(pair.Key, out var target)) continue;
                 old.TryGetValue(pair.Key, out var before);
+                // Graphic 不允许同根重复添加：迁移旧 Image 必须先于创建 NonDrawingGraphic。
+                var oldImage = target.GetComponent<UnityEngine.UI.Image>();
+                if (oldImage != null && Owner(tree,pair.Key)?.templateId == "Button" && pair.Value.GetComponent<UnityEngine.UI.Button>() != null && pair.Value.GetComponent<UnityEngine.UI.Image>() == null &&
+                    before?.components.Any(c => FindComponent(target, c.type) == oldImage) == true && !IsLocked(Owner(tree,pair.Key),PropGroup.Component))
+                {
+                    if (!LegacyButtonMigration.Referenced(oldImage, target.transform.root.gameObject, AssetDatabase.GUIDToAssetPath(tree.prefabGuid)))
+                    { Object.DestroyImmediate(oldImage); report.changed=true; report.lines.Add("已移除移至子节点的旧根 Image："+target.name); }
+                    else if (oldImage.enabled) { oldImage.enabled=false;report.changed=true; }
+                }
                 foreach (var c in Components(pair.Value))
                 {
                     if (FindComponent(target, c.Key) != null) continue;
@@ -261,6 +271,18 @@ namespace PsdTool
                     if (IsLocked(Owner(tree, pair.Key), PropGroup.Component)) continue;
                     if (!(c.Value is GameObject) && !(c.Value is Transform))
                     {
+                        if (c.Value is NonDrawingGraphic && target.GetComponent<UnityEngine.UI.Graphic>() != null)
+                        {
+                            // 受引用保护的旧 Graphic 留在原处，独立热区将事件冒泡给根 Button。
+                            var proxy=target.transform.Find("ButtonHitArea");
+                            if(proxy==null)
+                            {
+                                var hit=new GameObject("ButtonHitArea",typeof(RectTransform),typeof(NonDrawingGraphic));hit.transform.SetParent(target.transform,false);
+                                var rt=(RectTransform)hit.transform;rt.anchorMin=Vector2.zero;rt.anchorMax=Vector2.one;rt.offsetMin=rt.offsetMax=Vector2.zero;
+                                report.changed=true;
+                            }
+                            continue;
+                        }
                         target.AddComponent(c.Value.GetType()); report.changed = true;
                         addedComponents.Add(pair.Key + "|" + c.Key);
                         report.lines.Add("新增组件：" + target.name + "/" + c.Value.GetType().Name);
@@ -290,6 +312,18 @@ namespace PsdTool
                             report.lines.Add("待删除组件（已保留）：" + target.name + "/" + component.type.Split(',')[0]);
                             report.removals.Add(new Removal { key = pair.Key, component = component.type, label = target.name + "/" + component.type.Split(',')[0] });
                             var obsolete = FindComponent(target, component.type);
+                            if (obsolete is UnityEngine.UI.Image legacyImage && owner?.templateId == "Button" && !IsLocked(owner, PropGroup.Component) &&
+                                target.GetComponent<UnityEngine.UI.Button>() != null && pair.Value.GetComponent<UnityEngine.UI.Image>() == null)
+                            {
+                                if (!LegacyButtonMigration.Referenced(legacyImage, target.transform.root.gameObject, AssetDatabase.GUIDToAssetPath(tree.prefabGuid)))
+                                {
+                                    Object.DestroyImmediate(legacyImage); report.changed = true;
+                                    report.removals.RemoveAll(r => r.key == pair.Key && r.component == component.type);
+                                    report.lines.Add("已移除移至子节点的旧根 Image：" + target.name);
+                                    continue;
+                                }
+                                report.lines.Add("需人工复核：旧根 Image 存在引用，保留并停用：" + target.name);
+                            }
                             // 升级结构时，未手改过的旧布局/裁剪/图像先停用，避免覆盖新坐标或重复绘制 FX。
                             if ((obsolete is UnityEngine.UI.LayoutGroup || obsolete is UnityEngine.UI.ContentSizeFitter ||
                                  obsolete is UnityEngine.UI.RectMask2D || obsolete is UnityEngine.UI.Mask || obsolete is UnityEngine.UI.Graphic) &&
@@ -326,7 +360,7 @@ namespace PsdTool
                         bool newlyGenerated = added.Contains(pair.Key) || addedComponents.Contains(pair.Key + "|" + c.Key);
                         bool manuallyChanged = !newlyGenerated && (last != null ? actual != last.value : true);
                         // 已接管且未锁定的 Button 统一迁移反馈策略，事件仍由上面的属性过滤保护。
-                        if (c.Value is UnityEngine.UI.Button && owner?.templateId == "Button" && prior != null &&
+                        if (c.Value is UnityEngine.UI.Button && owner?.templateId == "Button" && (prior != null || owner.buttonFeedbackConfirmed) &&
                             (p.propertyPath == "m_Transition" || p.propertyPath == "m_Colors" || p.propertyPath == "m_SpriteState" || p.propertyPath == "m_TargetGraphic")) manuallyChanged = false;
                         if (IsLocked(owner, group) || (!Force(owner, group) && manuallyChanged))
                         { Preserve(owner, group, target.name + "/" + c.Value.GetType().Name + "/" + p.propertyPath, locks, report); continue; }

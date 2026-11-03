@@ -18,11 +18,11 @@ namespace PsdTool
         void OnGUI()
         {
             PsdEditorUI.Header("Prefab 变更预览", "核对变更后返回主窗口生成；此窗口不会保存 Prefab。");
-            EditorGUILayout.HelpBox("这里只预览 Prefab 变更，未保存 Prefab。图片使用当前切图；首次导入未切图时，预览不包含最终图片和裁边变化。返回主窗口点击“3  生成 Prefab”会重新计算后应用。", MessageType.Info);
+            PsdEditorUI.Notice("这里只预览 Prefab 变更，未保存 Prefab。图片使用当前切图；首次导入未切图时，预览不包含最终图片和裁边变化。返回主窗口点击“3  生成 Prefab”会重新计算后应用。", MessageType.Info);
             _scroll = EditorGUILayout.BeginScrollView(_scroll);
-            if (_lines == null || _lines.Length == 0) EditorGUILayout.LabelField("无 Prefab 变更。");
+            if (_lines == null || _lines.Length == 0) PsdEditorUI.Text("无 Prefab 变更。");
             else foreach (var line in _lines)
-                using (new EditorGUILayout.VerticalScope(PsdEditorUI.Card)) EditorGUILayout.LabelField(line, EditorStyles.wordWrappedLabel);
+                using (new EditorGUILayout.VerticalScope(PsdEditorUI.Card)) PsdEditorUI.Text(line, EditorStyles.wordWrappedLabel);
             EditorGUILayout.EndScrollView();
         }
     }

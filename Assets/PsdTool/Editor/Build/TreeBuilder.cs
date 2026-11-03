@@ -115,7 +115,15 @@ namespace PsdTool
                 if (!string.IsNullOrEmpty(prev.stableKey)) node.stableKey = prev.stableKey;
                 node.generatedAssetGuid = prev.generatedAssetGuid;
                 node.resourceOverride = prev.resourceOverride;
+                node.englishNameHint = prev.englishNameHint;
+                node.manualName = prev.manualName; node.nameReviewed = prev.nameReviewed;
+                node.nameReviewStructure = prev.nameReviewStructure;
+                node.nineShrinkDecision=prev.nineShrinkDecision;node.nineShrinkDecisionHash=prev.nineShrinkDecisionHash;
+                if (prev.manualName) node.generateBind = prev.generateBind;
+                if (prev.manualName || prev.nameReviewed) node.goName = prev.goName;
                 node.buttonHitKeys = new List<string>(prev.buttonHitKeys ?? new List<string>());
+                node.buttonColorTint=prev.buttonColorTint;
+                node.buttonFeedbackConfirmed=prev.buttonFeedbackConfirmed;
                 ScrollLayoutOptions.Copy(prev, node);
                 node.aiHasParentOverride = prev.aiHasParentOverride;
                 node.aiParentId = prev.aiParentId;

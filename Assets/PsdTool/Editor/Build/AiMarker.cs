@@ -19,12 +19,19 @@ namespace PsdTool
         public PsdTree tree;
         public PsdToolSettings settings;
         public string signature, note, error, reportFolder;
+        internal string feedback;
         public bool externalTask;
         internal string sourcePsdHash;
         string CurrentSignature() => externalTask ? AiVisualInput.TaskSignature(tree, settings, sourcePsdHash) : AiVisualInput.Signature(tree, settings);
         public readonly List<AiProposalRow> rows = new List<AiProposalRow>();
         public readonly List<AiRegionResult> regions = new List<AiRegionResult>();
         public bool generated;
+        internal void AcceptNamingEdits()
+        {
+            generated = false; generationChecked = false;
+            try { signature = CurrentSignature(); }
+            catch (Exception e) { error = "命名已保存；识别来源需重新校验：" + e.Message; }
+        }
         internal readonly List<GenerationIssue> generationIssues = new List<GenerationIssue>();
         internal bool generationChecked;
         internal string preflightError;
@@ -140,6 +147,12 @@ namespace PsdTool
             if (tree == null || settings == null || (external ? AiVisualInput.TaskSignature(tree, settings) : AiVisualInput.Signature(tree, settings)) != input.signature)
                 throw new InvalidOperationException("请求期间 PSD、节点树或配置发生了变化，本次结果未应用，请重新识别。");
             var plan = AiProtocol.Parse(json);
+            foreach (var hint in plan.names ?? new List<AiNodeName>())
+            {
+                var node = tree.Find(hint.layerId);
+                if (node != null && NodeNaming.ValidToken(hint.name)) node.englishNameHint = hint.name;
+            }
+            EditorUtility.SetDirty(tree);
             var state = new AiReviewState { tree = tree, settings = settings, signature = input.signature, note = input.note,
                 reportFolder = input.reportFolder ?? AiRegionRecognition.ReportFolder(input.signature), externalTask = external };
             if (external) state.sourcePsdHash = CodexTaskBridge.HashFile(tree.psdPath);
@@ -150,7 +163,7 @@ namespace PsdTool
                 var row = new AiProposalRow { proposal = proposal };
                 if (AiPlanEngine.Validate(tree, settings, proposal, out row.error))
                 {
-                    var ids = proposal.nodes.Select(n => n.layerId).ToArray();
+                    var ids = proposal.nodes.Where(n => n != null && (n.setTemplate || n.setSlot || n.setParent)).Select(n => n.layerId).ToArray();
                     if (ids.Any(touched.Contains)) row.error = "与另一个控件计划重复修改同一图层，请分开检查。";
                     else { foreach (int id in ids) touched.Add(id); row.selected = proposal.confidence >= min && !proposal.requiresReview; }
                 }

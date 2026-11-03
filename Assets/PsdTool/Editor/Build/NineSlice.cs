@@ -18,7 +18,7 @@ namespace PsdTool
     }
 
     /// <summary>
-    /// 只识别九宫边框，不改变源像素及尺寸，不自动抽取重复纹理。
+    /// 默认只识别九宫边框；compact 仅供已人工确认的缩图流程调用。
     /// 候选可拉伸区域用逐像素误差回验，超标则放弃。
     /// </summary>
     public static class NineSlice
@@ -61,14 +61,14 @@ namespace PsdTool
         }
 
         /// <param name="forced">@9s 的参数（左,上,右,下）；没有参数时传空字符串；未标记传 null。</param>
-        public static bool Try(Color32[] src, int w, int h, string forced, out NineSliceResult result)
+        public static bool Try(Color32[] src, int w, int h, string forced, out NineSliceResult result,bool compact=false)
         {
             result = default;
             if (src == null || w < 3 || h < 3 || src.Length < w * h) return false;
 
             if (forced != null)
             {
-                if (forced.Length == 0) return TryAuto(src, w, h, out result);
+                if (forced.Length == 0) return TryAuto(src, w, h, out result,compact);
                 if (!Parse(forced, out int left, out int top, out int right, out int bottom))
                 {
                     result.warning = "九宫参数应为 @9s:左,上,右,下";
@@ -82,27 +82,27 @@ namespace PsdTool
                 return Build(src, w, h,
                     new Axis { cap0 = left, cap1 = right, period = 1, keep = left, tail = w - right },
                     new Axis { cap0 = top, cap1 = bottom, period = 1, keep = top, tail = h - bottom },
-                    false, true, out result);
+                    false, true, out result,compact);
             }
 
-            return TryAuto(src, w, h, out result);
+            return TryAuto(src, w, h, out result,compact);
         }
 
-        static bool TryAuto(Color32[] src, int w, int h, out NineSliceResult result)
+        static bool TryAuto(Color32[] src, int w, int h, out NineSliceResult result,bool compact=false)
         {
             bool col = TryUniformRun(w, (a, b) => ColumnsEqual(src, w, h, a, b), out int cx, out int clen);
             bool row = TryUniformRun(h, (a, b) => RowsEqual(src, w, a, b), out int ry, out int rlen);
             if ((col || row) && Build(src, w, h,
                     col ? Axis.Slice(w, cx, clen) : Axis.Identity(w),
                     row ? Axis.Slice(h, ry, rlen) : Axis.Identity(h),
-                    false, false, out result))
+                    false, false, out result,compact))
                 return true;
 
             result = default;
             return false;
         }
 
-        static bool Build(Color32[] src, int w, int h, Axis ax, Axis ay, bool tiled, bool keepDespiteError, out NineSliceResult result)
+        static bool Build(Color32[] src, int w, int h, Axis ax, Axis ay, bool tiled, bool keepDespiteError, out NineSliceResult result,bool compact=false)
         {
             result = default;
             int mw = ax.cap0 + ax.period + ax.cap1;
@@ -121,13 +121,13 @@ namespace PsdTool
 
             Measure(src, w, h, dst, mw, ax, ay, out float avg, out int max);
             bool pass = avg <= MaxAvgError && max <= MaxPixelError;
-            if (!pass && !keepDespiteError) return false;
+            if (!pass && (!keepDespiteError||compact)) return false;
 
             result = new NineSliceResult
             {
-                pixels = src,
-                width = w,
-                height = h,
+                pixels = compact?dst:src,
+                width = compact?mw:w,
+                height = compact?mh:h,
                 border = new Vector4(ax.cap0, ay.cap1, ax.cap1, ay.cap0),
                 tiled = false,
                 avgError = avg,
@@ -135,6 +135,14 @@ namespace PsdTool
                 warning = pass ? null : $"九宫回验误差偏大（平均 {avg:0.##}，最大 {max}），仍按标记使用",
             };
             return true;
+        }
+        internal static Color32[] Reconstruct(NineSliceResult reduced,int w,int h)
+        {
+            var ax=new Axis{cap0=(int)reduced.border.x,cap1=(int)reduced.border.z,period=reduced.width-(int)reduced.border.x-(int)reduced.border.z};
+            var ay=new Axis{cap0=(int)reduced.border.w,cap1=(int)reduced.border.y,period=reduced.height-(int)reduced.border.w-(int)reduced.border.y};
+            var pixels=new Color32[w*h];
+            for(int y=0;y<h;y++)for(int x=0;x<w;x++)pixels[y*w+x]=reduced.pixels[Map(y,ay,h)*reduced.width+Map(x,ax,w)];
+            return pixels;
         }
 
         static int Source(int m, Axis a)

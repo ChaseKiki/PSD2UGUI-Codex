@@ -4,9 +4,9 @@
 
 **Unity 内的 PSD → uGUI Prefab 工具：从分层设计稿开始，用 Codex 辅助识别、重组、绑定，再由程序审核和生成。**
 
-支持普通中文图层名称，减少规则命名、重复切图、手动摆放和组件引用绑定。当前为 **Preview**，内置版本 `2026.11.03-preview.13`；复杂页面仍需要人工验收。
+支持普通中文图层名称，减少规则命名、重复切图、手动摆放和组件引用绑定。当前为 **Preview**，内置版本 `2026.11.03-preview.14`；复杂页面仍需要人工验收。
 
-- [下载 Unity 安装包](Releases/preview.13/PsdTool-2026.11.03-preview.13.unitypackage)
+- [下载 Unity 安装包](Releases/preview.14/PsdTool-2026.11.03-preview.14.unitypackage)
 - [完整使用说明](Assets/PsdTool/Documentation/使用说明.md)
 - [更新记录](Assets/PsdTool/Documentation/发布说明.md)
 - [MIT 许可证](LICENSE)
@@ -33,11 +33,12 @@
 - **布局细节**：按钮热区取正常底图、文字等视觉并集；ScrollRect 的 Handle 按可视区/内容尺寸计算，空列表或不足一屏时铺满轨道。Progress 可手工配置线性或径向填充。
 - **图片效果**：可调用本机 Photoshop，在临时副本上烘焙图片图层 FX；原 PSD 不直接修改。文字继续使用 TMP，部分效果近似还原。
 
-## 本次更新：preview.13
+## 本次更新：preview.14
 
-- Button 支持手动多选热区来源，按所选图片、文字或组的正常视觉并集计算，不移动画面。
-- 按钮统一原生 ColorTint，以最大可见 Image 为 TargetGraphic；不再生成按压缩放或 SpriteSwap，旧按钮按锁定和引用保护规则迁移。
-- 九宫只设置 Sprite Border / Image.Sliced，不再缩减导出图片尺寸；Android/iOS 压缩、图集配置与外部图片保护保留。
+- Codex 进度、识别审核与命名合并到一个工作台；提供完整节点清单、疑似遗漏线索和批量复核。
+- 节点命名逐项应用，结构变更后重新待确认；预览点击定位，支持 Prefab / Scene 选中联动与文本复制。
+- Button 默认 None，生成前确认可选 ColorTint，支持批量启用 / 禁用；原有多选热区、事件与锁定保护保留。
+- 九宫默认仅设置 Border；人工批准后可缩图，展示还原效果、PNG 字节实测及平台纹理负载估算，最终包体收益仍需构建实测。
 
 ## 环境与前置要求
 

@@ -46,6 +46,8 @@ namespace PsdTool
                 { region.error = "结构方案引用了未导出或空的图层，已隔离"; continue; }
                 if (structure.groups?.Any(g => g == null) == true)
                 { region.error = "结构方案包含空分组，已隔离"; continue; }
+                structure.nodes = structure.nodes.Where(e => e.setTemplate || e.setSlot || e.setParent).ToList();
+                if (structure.nodes.Count + (structure.groups?.Count ?? 0) == 0) continue;
                 bool containerPlan = row.type == "None";
                 int controls = structure.nodes.Count(e => e.setTemplate && Types.Contains(e.templateId) && e.templateId != "None") +
                     (structure.groups?.Count(g => Types.Contains(g.templateId) && g.templateId != "None") ?? 0);

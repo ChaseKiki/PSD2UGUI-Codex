@@ -23,6 +23,52 @@ namespace PsdTool
     }
     internal sealed partial class AiReviewState
     {
+        internal void PrepareFocusedRecognition()
+        {
+            if (CurrentSignature() != signature) RecheckAfterManualEdits();
+        }
+        internal void MergeFocused(CodexTaskImport incoming)
+        {
+            if (!incoming.focused || incoming.signature != CurrentSignature() || incoming.signature != signature)
+                throw new InvalidOperationException("补识别期间节点或来源已变化，请更新校验后重试；原审核结果保留。");
+            var requested=new HashSet<int>(incoming.focusRootIds ?? new[]{incoming.focusRootId});
+            foreach (var region in incoming.plan.regions)
+            {
+                if (!requested.Contains(region.rootId) && region.rootId != -1) continue;
+                var old = regions.FirstOrDefault(r => r.rootId == region.rootId);
+                int index = old?.proposalIndex ?? -1;
+                if (index >= 0 && rows[index].applied) index = -1;
+                if (region.proposalIndex >= 0)
+                {
+                    var plan = incoming.plan.controls[region.proposalIndex];
+                    plan.requiresReview = true;
+                    var row = new AiProposalRow { proposal = plan, selected = false };
+                    AiPlanEngine.Validate(tree, settings, plan, out row.error);
+                    if (index < 0) { index = rows.Count; rows.Add(row); } else rows[index] = row;
+                    region.proposalIndex = index;
+                    if (row.error == null)
+                        try { CheckOverlap(region, plan); } catch (InvalidOperationException e) { row.error = e.Message; }
+                }
+                else if (index >= 0)
+                {
+                    rows.RemoveAt(index);
+                    foreach (var existing in regions)
+                        if (existing.proposalIndex == index) existing.proposalIndex = -1;
+                        else if (existing.proposalIndex > index) existing.proposalIndex--;
+                }
+                region.snapshotFolder = incoming.folder;
+                if (old == null) regions.Add(region); else regions[regions.IndexOf(old)] = region;
+            }
+            foreach (var hint in incoming.plan.names ?? new List<AiNodeName>())
+            {
+                var node = tree.Find(hint.layerId);
+                if (node != null && NodeNaming.ValidToken(hint.name)) node.englishNameHint = hint.name;
+            }
+            EditorUtility.SetDirty(tree); AssetDatabase.SaveAssetIfDirty(tree);
+            generated = false; generationChecked = false; error = null;
+            feedback = "单节点 AI 补识别已合并；其他审核项保留，新方案须人工确认。";
+            SaveReport();
+        }
         internal bool IsIgnored(AiProposalRow row) => regions.Any(r => r.proposalIndex == rows.IndexOf(row) && r.status == AiRegionStatus.Ignored);
         internal void IgnoreRegion(AiRegionResult entry, bool restore = false)
         {
@@ -70,12 +116,12 @@ namespace PsdTool
                 var plan = AiRegionBindings.Build(tree, new AiRegion { rootId = entry.rootId, type = type, confidence = 1 });
                 plan.requiresReview = true; plan.reason = "人工指定类型，重新进行几何定位；尚未应用";
                 if (!AiPlanEngine.Validate(tree, settings, plan, out string message)) throw new InvalidOperationException(message);
-                var touched = new HashSet<int>(rows.Where((r, i) => i != entry.proposalIndex && r.error == null && r.proposal != null)
-                    .SelectMany(r => r.proposal.nodes).Select(n => n.layerId));
+                var touched = new HashSet<int>(rows.Where((r, i) => i != entry.proposalIndex && !r.applied && !IsIgnored(r) && r.error == null && r.proposal != null)
+                    .SelectMany(r => r.proposal.nodes).Where(n => n != null && (n.setTemplate || n.setSlot || n.setParent)).Select(n => n.layerId));
                 if (plan.nodes.Any(n => touched.Contains(n.layerId))) throw new InvalidOperationException("与其它可用方案重复修改图层，请先在节点树处理归属。");
                 var row = new AiProposalRow { proposal = plan, selected = false };
                 if (entry.proposalIndex < 0) { entry.proposalIndex = rows.Count; rows.Add(row); } else rows[entry.proposalIndex] = row;
-                entry.type = type; entry.confidence = 1; entry.reason = plan.reason; entry.message = "重新校验通过，请勾选确认";
+                entry.type = type; entry.confidence = 1; entry.reason = plan.reason; entry.message = "本地校验通过，请勾选确认（未请求 AI）";
                 entry.status = AiRegionStatus.NeedsReview;
             }
             catch (InvalidOperationException e)
@@ -84,8 +130,16 @@ namespace PsdTool
                 if (entry.proposalIndex >= 0) { rows[entry.proposalIndex].error = e.Message; rows[entry.proposalIndex].selected = false; }
             }
             generationChecked = false; SaveReport();
+            feedback = "本地校验完成（未请求 AI）：" + (entry.status == AiRegionStatus.Failed ? entry.message : "已生成待确认方案");
         }
-        internal void OverrideRegion(AiRegionResult entry)
+        internal List<AiProposalRow> PendingConflicts(AiRegionResult entry)
+        {
+            var proposal = entry.recoveryProposal;
+            var ids = new HashSet<int>((proposal?.nodes ?? new List<AiNodeEdit>()).Where(e => e != null && (e.setTemplate || e.setSlot || e.setParent)).Select(e => e.layerId));
+            return rows.Where((r, i) => i != entry.proposalIndex && !r.applied && r.error == null && !IsIgnored(r) &&
+                r.proposal?.nodes?.Any(e => e != null && (e.setTemplate || e.setSlot || e.setParent) && ids.Contains(e.layerId)) == true).ToList();
+        }
+        internal void OverrideRegion(AiRegionResult entry, bool replacePendingConflicts = false)
         {
             if (CurrentSignature() != signature) throw new InvalidOperationException("来源已变化，请先更新校验或重新识别。");
             RefreshStatuses();
@@ -95,6 +149,8 @@ namespace PsdTool
             var proposal = entry.recoveryProposal;
             if (!AiProtocol.HasEdits(proposal)) throw new InvalidOperationException("此项没有独立的可应用方案；若属于 Dropdown，请先应用父控件项，否则重新校验此项。");
             proposal = JsonUtility.FromJson<AiControlProposal>(JsonUtility.ToJson(proposal));
+            proposal.nodes = proposal.nodes.Where(e => e == null || e.setTemplate || e.setSlot || e.setParent).ToList();
+            if (proposal.nodes.Any(e => e == null)) throw new InvalidOperationException("此 AI 方案包含空节点，请重新请求 AI 识别。");
             proposal.manualOverride = new HashSet<int>(proposal.nodes.Select(n => n.layerId));
             // Existing virtual groups may be reused by stable member keys.
             foreach (var node in tree.nodes.Where(n => n.aiGeneratedGroup))
@@ -104,6 +160,17 @@ namespace PsdTool
                     if (parent.layerId == entry.rootId) { proposal.manualOverride.Add(node.layerId); break; }
             }
             if (!AiPlanEngine.Validate(tree, settings, proposal, out string message)) throw new InvalidOperationException(message);
+            var conflicts = PendingConflicts(entry);
+            if (conflicts.Count > 0 && !replacePendingConflicts)
+                throw new InvalidOperationException("此方案与待应用方案重叠；请确认以本条完整方案替换冲突建议，或重新请求 AI。");
+            // Validate the complete replacement before changing the review selection.
+            // Applied plans remain protected; this only retires pending suggestions.
+            foreach (var conflict in conflicts)
+            {
+                conflict.selected = false; conflict.error = "已由人工选择的完整方案替代";
+                foreach (var region in regions.Where(r => r.proposalIndex == rows.IndexOf(conflict)))
+                { region.status = AiRegionStatus.Ignored; region.message = conflict.error; }
+            }
             InstallReviewed(entry, proposal);
             ApplySelected(true, rows[entry.proposalIndex]);
         }
@@ -180,9 +247,9 @@ namespace PsdTool
         }
         void CheckOverlap(AiRegionResult entry, AiControlProposal proposal)
         {
-            var touched = new HashSet<int>(rows.Where((r, i) => i != entry.proposalIndex && r.error == null && r.proposal != null && !IsIgnored(r))
-                .SelectMany(r => r.proposal.nodes).Select(n => n.layerId));
-            if (proposal.nodes.Any(n => touched.Contains(n.layerId))) throw new InvalidOperationException("与其它方案重复修改图层，请先处理归属，未强制覆盖冲突。");
+            var touched = new HashSet<int>(rows.Where((r, i) => i != entry.proposalIndex && !r.applied && r.error == null && r.proposal != null && !IsIgnored(r))
+                .SelectMany(r => r.proposal.nodes).Where(n => n != null && (n.setTemplate || n.setSlot || n.setParent)).Select(n => n.layerId));
+            if (proposal.nodes.Any(n => n != null && (n.setTemplate || n.setSlot || n.setParent) && touched.Contains(n.layerId))) throw new InvalidOperationException("与其它方案重复修改图层；可用本条完整方案明确替换重叠的待应用建议，或重新请求 AI。");
         }
         void InstallReviewed(AiRegionResult entry, AiControlProposal proposal)
         {

@@ -1,0 +1,12 @@
+Preview.14 validation — Windows / Unity 2022.3.62f3c1
+
+PASS: clean export; 107 product assets, no Tests, Editor/Data, Runtime/Generated, PSD, credentials or business assets.
+PASS: final unitypackage imported into an initially empty Unity project.
+PASS: Editor/Runtime compile, main menu, clean default settings and TMP Essentials import.
+PASS: source-node naming, structural re-review, focused/batch task transport and review preservation.
+PASS: Button default None, confirmation-before-generation, cancel/no-button paths, ColorTint bulk choices, events and GUID/FileID.
+PASS: explicit nine-slice shrinking, pixel/PNG comparisons, restore/stale approval, shared/external resource protection.
+
+Online model recognition was not rerun for this release. Matching quality and actual production PSDs still require user review.
+Texture payload estimates are not measured APK/IPA size savings.
+No project-specific localization adapter or language dictionary is included.

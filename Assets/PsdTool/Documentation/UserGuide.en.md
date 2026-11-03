@@ -2,7 +2,32 @@
 
 [简体中文](使用说明.md) | [English](UserGuide.en.md)
 
-Version: `2026.10.30-preview.11`. Tested with Windows, Unity 2022.3.62f3c1, uGUI 1.0.0 and TextMeshPro 3.0.7. The editor UI is primarily Chinese; translations below explain the existing labels rather than promise an English interface.
+## Preview.14 — unified workbench and generation reviews
+
+The naming inventory keeps the m_ shortcut visible but disables it when the proposed name already starts with m_. Preview clicks also locate the source node; existing enlargement remains available and the source tree reveals the selected row.
+
+New/unconfigured Buttons default to Transition=None. After naming, Generate opens a dedicated feedback confirmation when any Button exists. Each editable row chooses ColorTint or None; “一键全动画” selects ColorTint for all editable rows and “全禁动画” selects None. Confirm saves choices and starts export/generation; cancel keeps the draft unapplied. Saved choices survive reparsing. Locked and manually added Buttons are listed read-only and retain their settings. These shortcuts control Button.Transition only, not project scripts, Animator or protected legacy scaling components. With no Buttons the dialog is skipped.
+Codex setup/progress, recognition review and naming now share one workbench. Naming links expand “Prefab 命名与漏识别复核” rather than opening another window. Each source-node row has a thumbnail, editable name and “应用名称”; it updates generation data only. Generate/Update writes the Prefab. Structural confirmation stamps return affected names to pending after type, slot, reparenting, ancestor or subtree changes while preserving manual names. Legacy confirmations need one structural review.
+
+The inventory can show pending names, possible omissions or every source node. Local image/text and standalone-icon heuristics are review leads, not automatic Button classification. Select candidates for one Codex batch (up to 100), inspect the returned executable suggestions and apply them separately. Existing review state is retained. Body text, paths and errors support selection/copy; button, checkbox and foldout captions provide right-click copy. Pixel text inside images is not selectable.
+
+“本地重新校验（非 AI）” rebuilds local geometry/binding suggestions without calling Codex. “重新请求 AI 识别” submits a focused node crop together with page/layer context for a fresh executable proposal. Search all source nodes by name, path or ID to retry a missing Image, text or group. Focused results merge into the existing review without auto-applying; overlapping pending proposals require explicit replacement confirmation. Stale results are rejected.
+
+Prefab/Scene selection follows stable source identities while the tool window is open. Generated helper objects resolve to their source owner; clean exported copies cannot be linked. Detail edits update tool data and take effect through “更新 Prefab”; they do not automatically save a Scene. The source tree remains available before generation or with selection-following disabled.
+
+All node kinds, including groups, have side-by-side original-PSD crop and page-location previews. The detail panel uses always-visible background cards for naming/type, control settings, sprite export, adaptation, incremental protection and read-only source data, with tooltips for advanced options. Naming rows include a clickable source thumbnail, source path and editable proposed name.
+
+AI-result cards no longer show naming or m_ shortcuts. Use the naming inventory to edit/apply names and add m_; node details retain their existing naming support. Changes update generation data before the next explicit Prefab update.
+
+The workbench now includes “九宫缩图 · 人工确认”. Analyze candidates, inspect original/reconstructed previews, dimensions and pixel reconstruction error, then explicitly approve shrinking or keep the original size. Decisions alone do not write images. Default export remains border-only; an approved, still-matching source may produce a smaller sliced sprite during Generate/Update. Changed pixels/borders invalidate approval. Shared/manual/external resources retain their protection; keeping the original restores full dimensions on the next export. Prefab layout stays unchanged, but Sprite.rect and SetNativeSize behavior can change.
+
+Each row reports actual PNG-encoded bytes, an RGBA32 baseline, rectangular atlas area and Android/iOS standalone texture payload estimates with block alignment, max-size limits and mip levels where known. Unknown/automatic formats are not assigned invented byte values. These are not measured APK/IPA savings: atlas pages, packing and final build compression require a separate build comparison. No total package-size saving is claimed.
+
+After reviewing structure, Generate opens a naming preview. The first Codex request also proposes semantic English base names; there is no extra naming request. Old results use deterministic type/role defaults. Controls use m_; other nodes can opt in with “程序访问节点（m_）”. This is naming metadata, not C# Binder generation. Component parts include their slot role. Names use ASCII identifiers; sibling collisions are case-insensitive. Automatic suggestions use suffixes; manual duplicates cannot be saved. Manual names and name locks survive reparsing. The Prefab asset name is still managed by panel/output configuration. Renaming existing objects can affect transform.Find path strings.
+
+Use the naming inventory or node details to rename nodes; AI-result cards keep their recognition actions only. Image-to-Button migration removes an unreferenced, unlocked generated root Image after moving artwork to its child. Referenced legacy Images stay disabled and reported; an independent hit area preserves pointer input.
+
+Version: `2026.11.03-preview.14`. Tested with Windows, Unity 2022.3.62f3c1, uGUI 1.0.0 and TextMeshPro 3.0.7. The editor UI is primarily Chinese; translations below explain the existing labels rather than promise an English interface.
 
 ## Team responsibilities
 
@@ -87,7 +112,7 @@ ScrollViews keep PSD positions by default. On an individual ScrollView recogniti
 
 Layout settings survive reparsing. Switching back to PSD mode leaves old generated components pending explicit removal review, following the incremental protection policy.
 
-Buttons now use native ColorTint feedback and the largest normally visible Image on the control or its descendants as TargetGraphic. Press scaling and SpriteSwap generation are removed. UIGray remains optional. Regeneration migrates managed, unlocked Buttons while preserving events. Unreferenced legacy scaling components recorded in the import baseline are removed; referenced components and those with external asset dependencies are retained and reported. The legacy script remains only for compatibility. Incremental PsdGeneratedNode identities stay hidden in the Inspector.
+Buttons default to None, with optional native ColorTint chosen in the generation confirmation. The largest normally visible Image on the control or its descendants remains TargetGraphic. Press scaling and SpriteSwap generation are removed. UIGray remains optional. Regeneration applies confirmed feedback to managed, unlocked Buttons while preserving events. Unreferenced legacy scaling components recorded in the import baseline are removed; referenced components and those with external asset dependencies are retained and reported. The legacy script remains only for compatibility. Incremental PsdGeneratedNode identities stay hidden in the Inspector.
 
 Select a Button in the node tree and open “选择按钮热区来源…” (Choose button hit-area sources). Select multiple images, text layers or groups; their normal visual bounds form the root hit area without moving artwork. An empty selection restores the default visual union. Hidden/state/deleted sources are ignored; an entirely invalid selection falls back with a warning. Unlock Rect before saving. Selections survive reparsing.
 

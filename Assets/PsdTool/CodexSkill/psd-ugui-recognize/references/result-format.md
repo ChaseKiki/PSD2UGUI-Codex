@@ -17,7 +17,9 @@ Output: UTF-8 JSON object in the same task directory, named **result.json**, wit
       "confidence": 0.92,
       "reason": "Checkbox with a visible check and adjacent label"
     }
-  ]
+  ],
+  "structures": [],
+  "names": [{"layerId": 123, "name": "RowSelection"}]
 }
 ```
 
@@ -26,6 +28,7 @@ The ID and classification above are examples, never expected answers. Replace th
 - `version`: integer `1`.
 - `taskId` and `signature`: exact strings from this task.
 - `status`: literal `completed`, only after every supplied image was inspected.
+- `names`: English semantic base-name proposals for existing source IDs; Unity reviews/applies final names after structure handling.
 - `regions`: complete, unique coverage of the task's root IDs. No missing, extra, duplicate or invented IDs.
 - `type`: exactly `None`, `Button`, `Toggle`, `InputField`, `ScrollView`, `Dropdown`, `Slider` or `Progress`.
 - `confidence`: finite number in `[0,1]`; no strings, NaN or Infinity.
@@ -42,5 +45,7 @@ Each node edit has all fields: `{layerId, setTemplate, setSlot, setParent, templ
 New groups have all fields `{groupId, parentId, templateId, slot, name, bounds}`. groupId must be a unique temporary integer below -1 (e.g. -1001); node parentId can reference it. parentId otherwise references an existing group or -1 for the canvas root. New groups must have existing source children, and may wrap an image as an InputField root while the image remains bg. Use `bounds: []` for ordinary groups; only viewport groups may give [x,y,width,height] within the PSD. Names are short display names only. For a single-widget region, at least one existing/new root must receive the classified template type. For a None layout container with clearly separated controls, supply their virtual/existing widget roots and complete source-part membership in ONE structure entry; leave the outer container generic. This split proposal is explicitly reviewed before application. Do not omit valid controls merely because the artist did not group them.
 
 Avoid changes to manual/locked layers. Preserve visual placement, stacking and group opacity/clipping. Cross-group membership proposals within this PSD are allowed only when visually clear and remain subject to Unity's review/validation. Do not move parts belonging to another widget. Slider requires track/fill/handle; linear Progress requires track/fill. A radial Progress needs explicit supported radial handling; otherwise omit its structure and let Unity show unsupported status.
+
+Also include top-level `names: [{"layerId": 12, "name": "Purchase"}]`. Use readable English ASCII identifiers, maximum 96 characters, for existing source IDs only. Give semantic base names without m_ or mandatory slot/type suffixes; Unity adds them after the final structure is known and presents a naming preview for confirmation. Supply virtual-group semantics through each group's `name`. Invalid naming suggestions are ignored without rejecting valid control proposals. Older result files without `names` remain importable and use Unity's deterministic naming fallback.
 
 Unity rejects a wrong task ID/signature, stale PSD/tree, modified inputs, cross-project results, or malformed JSON. Per-region semantic problems are isolated and reported; valid regions remain reviewable. A successful import creates a review; it does not automatically modify a Prefab.

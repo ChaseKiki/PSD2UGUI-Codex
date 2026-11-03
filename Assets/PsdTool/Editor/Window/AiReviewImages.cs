@@ -86,9 +86,10 @@ namespace PsdTool
         bool overview;
         internal static void Open(AiReviewState state, AiRegionResult region, AiControlProposal proposal)
         {
+            if(state.tree.Find(region.rootId)!=null)PsdToolWindow.FocusNode(state.tree,state.settings,region.rootId);
             var window = GetWindow<AiRegionPreviewWindow>("PSD 区域定位");
             window.state = state; window.region = region; window.proposal = proposal; window.overview = false;
-            window.images.Load(state.reportFolder); window.minSize = new Vector2(480, 400); window.Show();
+            window.images.Load(region.snapshotFolder ?? state.reportFolder); window.minSize = new Vector2(480, 400); window.Show();
         }
         void OnDisable() => images.Dispose();
         void OnGUI()
@@ -99,9 +100,9 @@ namespace PsdTool
             {
                 overview = GUILayout.Toolbar(overview ? 1 : 0, new[] { "区域放大", "整图定位 / 跨组部件" }) == 1;
                 using (new EditorGUI.DisabledScope(state.tree.Find(region.rootId) == null))
-                    if (GUILayout.Button("定位节点", GUILayout.Width(90))) PsdToolWindow.FocusNode(state.tree, state.settings, region.rootId);
+                    if (PsdEditorUI.CopyButton("定位节点", GUILayout.Width(90))) PsdToolWindow.FocusNode(state.tree, state.settings, region.rootId);
             }
-            EditorGUILayout.LabelField(state.NodePath(region.rootId), EditorStyles.wordWrappedMiniLabel);
+            PsdEditorUI.Text(state.NodePath(region.rootId), EditorStyles.wordWrappedMiniLabel);
             var texture = overview ? images.Overview() : images.Region(region.rootId);
             var area = GUILayoutUtility.GetRect(100, 100, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
             EditorGUI.DrawRect(area, new Color(.13f, .13f, .13f));

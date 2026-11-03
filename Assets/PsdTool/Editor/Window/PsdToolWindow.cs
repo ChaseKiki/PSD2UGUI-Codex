@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using PsdTool.Parser;
@@ -18,11 +18,16 @@ namespace PsdTool
         PsdDocument _doc;
         string _docStamp;
         int _selected = -1;
+        bool _revealSelected;
         readonly HashSet<int> _collapsed = new HashSet<int>();
         Dictionary<int, List<PsdNode>> _children;
         Vector2 _treeScroll, _detailScroll, _reportScroll;
         [SerializeField] bool _maintenance;
         bool _sourceDetails, _showReport;
+        string _detailError;
+        [SerializeField] bool _followPrefabSelection = true;
+        readonly PsdNodePreview _nodePreview = new PsdNodePreview();
+        void OnDisable() { Selection.selectionChanged -= FollowPrefabSelection; _nodePreview.Dispose(); }
         GUIStyle _rowStyle, _selectedRowStyle;
 
         [MenuItem("Tools/PSD 工具/打开工具", false, 0)]
@@ -32,6 +37,7 @@ namespace PsdTool
             var window = GetWindow<PsdToolWindow>("PSD 转 UGUI");
             window._tree = tree; window._settings = settings; window._psdPath = tree.psdPath;
             window._moduleName = tree.moduleName; window._panelName = tree.panelName; window._selected = id; window._doc = null;
+            window._revealSelected=true;
             var seen = new HashSet<int>();
             for (var node = tree.Find(id); node != null && seen.Add(node.layerId); node = tree.Find(node.parentId)) window._collapsed.Remove(node.layerId);
             window._treeScroll = Vector2.zero; window.Show(); window.Repaint();
@@ -40,25 +46,41 @@ namespace PsdTool
         void OnEnable()
         {
             _settings = PsdToolSettings.Load();
+            Selection.selectionChanged += FollowPrefabSelection;
+            FollowPrefabSelection();
+        }
+        void FollowPrefabSelection()
+        {
+            if (!_followPrefabSelection || CodexTaskRunner.Busy || !PsdNodeSelection.Resolve(Selection.activeGameObject, out var tree, out var node)) return;
+            if (_tree != tree)
+            {
+                _tree = tree; _psdPath = tree.psdPath; _moduleName = tree.moduleName; _panelName = tree.panelName;
+                _doc = null; _docStamp = null; _nodePreview.Dispose();
+            }
+            _selected = node.layerId; _detailError = null;
+            _revealSelected=true;
+            var seen = new HashSet<int>();
+            for (var parent = node; parent != null && seen.Add(parent.layerId); parent = tree.Find(parent.parentId)) _collapsed.Remove(parent.layerId);
+            Repaint();
         }
 
         void OnGUI()
         {
-            minSize = new Vector2(620, 520);
+            minSize = new Vector2(760, 640);
             EnsureStyles();
             using (new EditorGUI.DisabledScope(CodexTaskRunner.Busy)) DrawHeader();
             EditorGUILayout.Space(4);
             if (CodexTaskRunner.Busy)
             {
-                EditorGUILayout.HelpBox(CodexTaskRunner.Status, MessageType.Info);
-                if (GUILayout.Button("查看识别进度")) CodexTaskWindow.Open(_tree, _settings);
-                if (GUILayout.Button("取消识别")) CodexTaskRunner.Cancel();
+                PsdEditorUI.Notice(CodexTaskRunner.Status, MessageType.Info);
+                if (PsdEditorUI.CopyButton("查看识别进度")) CodexTaskWindow.Open(_tree, _settings);
+                if (PsdEditorUI.CopyButton("取消识别")) CodexTaskRunner.Cancel();
                 Repaint(); return;
             }
 
             if (_tree == null || _tree.nodes.Count == 0)
             {
-                EditorGUILayout.HelpBox("选择 PSD 文件后点击“解析”。PSD 源文件建议放在 Assets 之外。", MessageType.Info);
+                PsdEditorUI.Notice("选择 PSD 文件后点击“解析”。PSD 源文件建议放在 Assets 之外。", MessageType.Info);
                 return;
             }
 
@@ -90,11 +112,11 @@ namespace PsdTool
         {
             PsdEditorUI.Header("PSD 转 UGUI", "1 选择并解析 PSD   →   2 Codex 识别与审核   →   3 生成并验收");
             EditorGUILayout.BeginVertical(PsdEditorUI.Card);
-            _sourceDetails = EditorGUILayout.Foldout(_sourceDetails, "项目配置 / 接续已有节点树", true);
+            _sourceDetails = PsdEditorUI.CopyFoldout(_sourceDetails, "项目配置 / 接续已有节点树", true);
             if (_sourceDetails)
             {
             _settings = (PsdToolSettings)EditorGUILayout.ObjectField("工具设置", _settings, typeof(PsdToolSettings), false);
-            if (_settings != null && GUILayout.Button("编辑项目配置")) Selection.activeObject = _settings;
+            if (_settings != null && PsdEditorUI.CopyButton("编辑项目配置")) Selection.activeObject = _settings;
 
             var tree = (PsdTree)EditorGUILayout.ObjectField("节点树", _tree, typeof(PsdTree), false);
             if (tree != _tree)
@@ -113,7 +135,7 @@ namespace PsdTool
             }
             EditorGUILayout.BeginHorizontal();
             _psdPath = EditorGUILayout.TextField("PSD 文件", _psdPath);
-            if (GUILayout.Button("浏览", GUILayout.Width(50)))
+            if (PsdEditorUI.CopyButton("浏览", GUILayout.Width(50)))
             {
                 string dir = string.IsNullOrEmpty(_psdPath) ? "" : Path.GetDirectoryName(_psdPath);
                 string picked = EditorUtility.OpenFilePanelWithFilters("选择 PSD", dir, new[] { "Photoshop", "psd,psb" });
@@ -130,7 +152,7 @@ namespace PsdTool
 
             if (_settings != null && !string.IsNullOrEmpty(_moduleName) && !string.IsNullOrEmpty(_panelName))
             {
-                EditorGUILayout.LabelField("Prefab", _settings.PrefabPath(_moduleName.Trim(), _panelName.Trim()), EditorStyles.miniLabel);
+                PsdEditorUI.Text("Prefab", _settings.PrefabPath(_moduleName.Trim(), _panelName.Trim()), EditorStyles.miniLabel);
 
             }
 
@@ -138,14 +160,23 @@ namespace PsdTool
             EditorGUILayout.BeginHorizontal();
             using (new EditorGUI.DisabledScope(!ready))
             {
-                if (GUILayout.Button("1  解析 PSD", GUILayout.Height(28))) Run(Parse);
-                if (GUILayout.Button("2  Codex 识别", GUILayout.Height(28))) Run(MarkWithCodex);
-                if (GUILayout.Button("3  生成 Prefab", GUILayout.Height(28))) Run(Generate);
+                if (PsdEditorUI.CopyButton("1  解析 PSD", GUILayout.Height(28))) Run(Parse);
+                if (PsdEditorUI.CopyButton("2  Codex 识别", GUILayout.Height(28))) Run(MarkWithCodex);
+                bool exists = _tree != null && AssetDatabase.LoadAssetAtPath<GameObject>(AssetDatabase.GUIDToAssetPath(_tree.prefabGuid)) != null;
+                if (PsdEditorUI.CopyButton(exists ? "3  更新 Prefab" : "3  生成 Prefab", GUILayout.Height(28))) Run(Generate);
             }
             EditorGUILayout.EndHorizontal();
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                bool follow = PsdEditorUI.CopyToggleLeft(new GUIContent("跟随 Prefab / Scene 选中节点", "在 Unity 层级或场景中选中工具生成的节点，自动显示对应详情；辅助节点定位到所属来源节点。"), _followPrefabSelection);
+                if (follow != _followPrefabSelection) { _followPrefabSelection = follow; if (follow) FollowPrefabSelection(); }
+                var prefab = _tree == null ? null : AssetDatabase.LoadAssetAtPath<GameObject>(AssetDatabase.GUIDToAssetPath(_tree.prefabGuid));
+                using (new EditorGUI.DisabledScope(prefab == null))
+                    if (PsdEditorUI.CopyButton("打开 Prefab", GUILayout.Width(100))) AssetDatabase.OpenAsset(prefab);
+            }
             if (AiMarker.Last?.tree == _tree && AiMarker.Last != null && PsdEditorUI.Action("查看识别结果 / 处理待办")) AiRecognitionWindow.Open(AiMarker.Last);
             EditorGUILayout.EndVertical();
-            _maintenance = EditorGUILayout.Foldout(_maintenance, "维护与审核", true);
+            _maintenance = PsdEditorUI.CopyFoldout(_maintenance, "维护与审核", true);
             if (_maintenance)
             {
                 using (new EditorGUILayout.HorizontalScope())
@@ -163,13 +194,13 @@ namespace PsdTool
                         CleanPrefabExportWindow.Open(AssetDatabase.LoadAssetAtPath<GameObject>(AssetDatabase.GUIDToAssetPath(_tree.prefabGuid)));
                 EditorGUILayout.BeginHorizontal();
                 using (new EditorGUI.DisabledScope(_settings == null))
-                    if (GUILayout.Button("重建资源索引")) Run(() => SpriteIndex.Rebuild(_settings));
+                    if (PsdEditorUI.CopyButton("重建资源索引")) Run(() => SpriteIndex.Rebuild(_settings));
                 using (new EditorGUI.DisabledScope(_tree == null || string.IsNullOrEmpty(_tree.prefabGuid)))
                 {
-                    if (GUILayout.Button("审核待删除节点 / 组件")) Run(ConfirmRemovals);
+                    if (PsdEditorUI.CopyButton("审核待删除节点 / 组件")) Run(ConfirmRemovals);
                 }
                 EditorGUILayout.EndHorizontal();
-                EditorGUILayout.LabelField("改稿后的删除审核会保护已有人工引用；仅在确认清理时使用。", EditorStyles.wordWrappedMiniLabel);
+                PsdEditorUI.Text("改稿后的删除审核会保护已有人工引用；仅在确认清理时使用。", EditorStyles.wordWrappedMiniLabel);
             }
         }
 
@@ -227,7 +258,19 @@ namespace PsdTool
         {
             if (_doc == null || _tree == null || _docStamp != TreeBuilder.Stamp(_psdPath) || _tree.psdPath != _psdPath)
                 Parse();
+            var requestedTree=_tree;var requestedSettings=_settings;
+            NodeNamingWindow.Open(_tree, () => {
+                if(_tree!=requestedTree||_settings!=requestedSettings)throw new InvalidOperationException("主窗口已切换来源或配置，请重新点击生成。");
+                GenerateConfirmed();
+            },-1,_settings);
+        }
 
+        void GenerateConfirmed()
+        {
+            if(_tree==null)throw new InvalidOperationException("节点树已丢失，请重新打开工作台。");
+            string currentStamp=TreeBuilder.Stamp(_tree.psdPath);
+            if(_doc==null||_doc.FilePath!=_tree.psdPath||_docStamp!=currentStamp)
+            {_doc=PsdParser.Parse(_tree.psdPath);_docStamp=currentStamp;_psdPath=_tree.psdPath;}
             // Diagnose widget structure before exporting any resources.
             var preflight = GenerationPreflight.Inspect(_tree, _settings);
             foreach (var issue in preflight)
@@ -299,7 +342,7 @@ namespace PsdTool
         void DrawTree()
         {
             EditorGUILayout.BeginVertical(GUILayout.Width(position.width * 0.55f));
-            EditorGUILayout.LabelField($"节点树（{_tree.nodes.Count} 个节点，顺序与 PS 图层面板一致）", EditorStyles.boldLabel);
+            PsdEditorUI.Text($"节点树（{_tree.nodes.Count} 个节点，顺序与 PS 图层面板一致）", EditorStyles.boldLabel);
             _treeScroll = EditorGUILayout.BeginScrollView(_treeScroll, "box", GUILayout.ExpandHeight(true));
             DrawNodes(-1, 0);
             EditorGUILayout.EndScrollView();
@@ -330,11 +373,13 @@ namespace PsdTool
                     GUILayout.Space(16);
                 }
 
-                if (GUILayout.Button(RowLabel(n), n.layerId == _selected ? _selectedRowStyle : _rowStyle))
+                if (PsdEditorUI.CopyButton(RowLabel(n), n.layerId == _selected ? _selectedRowStyle : _rowStyle))
                 {
                     _selected = n.layerId;
                     GUI.FocusControl(null);
                 }
+                if(n.layerId==_selected&&_revealSelected&&Event.current.type==EventType.Repaint)
+                {_treeScroll.y=Mathf.Max(0,GUILayoutUtility.GetLastRect().y-120);_revealSelected=false;Repaint();}
                 EditorGUILayout.EndHorizontal();
 
                 if (hasChildren && expanded) DrawNodes(n.layerId, depth + 1);
@@ -388,138 +433,103 @@ namespace PsdTool
         void DrawDetail()
         {
             EditorGUILayout.BeginVertical();
-            EditorGUILayout.LabelField("节点标签（点选，勿手写图层名）", EditorStyles.boldLabel);
-            _detailScroll = EditorGUILayout.BeginScrollView(_detailScroll, "box", GUILayout.ExpandHeight(true));
-
-            var n = _selected != -1 ? _tree.Find(_selected) : null;
-            if (n == null)
-            {
-                EditorGUILayout.LabelField("在左侧选择一个节点");
-            }
+            PsdEditorUI.Text("节点详情", EditorStyles.boldLabel);
+            PsdEditorUI.Text("在左侧节点树或已打开的 Prefab / Scene 选中节点。修改保存到工具数据，更新 Prefab 后生效。", EditorStyles.wordWrappedMiniLabel);
+            _detailScroll=EditorGUILayout.BeginScrollView(_detailScroll,"box",GUILayout.ExpandHeight(true));
+            var n=_selected!=-1?_tree.Find(_selected):null;
+            if(n==null)PsdEditorUI.Text("在左侧选择节点，可查看组或图层的 PSD 区域。");
             else
             {
+                using(PsdEditorUI.Section("命名与类型 · 生成前"))
+                {
+                using(new EditorGUILayout.HorizontalScope())
+                {
+                    string name=EditorGUILayout.DelayedTextField(new GUIContent("Prefab 节点名","仅修改 Unity 输出名，不改 PSD。回车保存；校验英文、m_ 前缀、部件角色和同层重名。"),n.goName);
+                    if(name!=n.goName)try{NodeNaming.Rename(_tree,n,name);_detailError=null;}catch(Exception e){_detailError=e.Message;}
+                    using(new EditorGUI.DisabledScope((n.locks&PropGroup.Name)!=0))
+                        if(PsdEditorUI.CopyButton(new GUIContent("m_节点","保留当前英文名，一键加 m_ 并标为程序访问节点；下次生成生效。中文名使用英文建议，重名自动补编号。"),GUILayout.Width(65)))
+                            try{NodeNaming.MarkProgramNode(_tree,n);_detailError=null;}catch(Exception e){_detailError=e.Message;}
+                    if(PsdEditorUI.CopyButton("批量…",GUILayout.Width(55)))NodeNamingWindow.Open(_tree,null,-1,_settings);
+                }
+                if(_detailError!=null)PsdEditorUI.Notice(_detailError,MessageType.Warning);
+                Undo.RecordObject(_tree,"编辑 PSD 节点");
                 EditorGUI.BeginChangeCheck();
-                n.goName = EditorGUILayout.TextField("名称", n.goName);
-
-                int tIndex = Mathf.Max(0, Array.IndexOf(Markers.TemplateIds, n.templateId ?? string.Empty));
-                tIndex = EditorGUILayout.Popup("控件类型", tIndex, Markers.TemplateLabels);
-                n.templateId = Markers.TemplateIds[tIndex];
-                if (n.templateId == "Progress") PsdProgressUI.Draw(n);
-                if (n.templateId == "ScrollView" && GUILayout.Button("排列与自适应…"))
-                    ScrollLayoutWindow.Open(n, options =>
+                string oldType=n.templateId;
+                int ti=Mathf.Max(0,Array.IndexOf(Markers.TemplateIds,n.templateId??""));
+                n.templateId=Markers.TemplateIds[EditorGUILayout.Popup("控件类型",ti,Markers.TemplateLabels)];
+                if(oldType!=n.templateId&&!n.manualName)n.nameReviewed=false;
+                using(new EditorGUI.DisabledScope(PrefabGenerator.IsControl(n.templateId)))
+                {
+                    bool program=EditorGUILayout.Toggle(new GUIContent("程序访问节点（m_）","控件默认启用。图片、文字或组可显式标记，命名预览会添加 m_ 前缀。当前只管理命名，不生成 Binder/C# 代码。"),NodeNaming.ProgramNode(n));
+                    if(!PrefabGenerator.IsControl(n.templateId))n.generateBind=program;
+                }
+                }
+                using(PsdEditorUI.Section(null))_nodePreview.Draw(_tree,n,140,_settings);
+                using(PsdEditorUI.Section("控件配置 · 识别/生成时"))
+                {
+                    int si=Mathf.Max(0,Array.IndexOf(SlotChoices,n.slot??""));
+                    n.slot=SlotChoices[EditorGUILayout.Popup(new GUIContent("部件插槽","指定该图层在所属控件中的作用，例如背景、文字、勾选图；影响组件引用与命名。"),si,SlotLabels)];
+                    if(n.templateId=="Button")
                     {
-                        if ((n.locks & (PropGroup.Component | PropGroup.Rect)) != 0) throw new InvalidOperationException("请先解除组件或矩形锁定。");
-                        if (n.slot == "template" || _tree.Find(n.parentId)?.templateId == "Dropdown") throw new InvalidOperationException("Dropdown 模板由 TMP 管理排列。");
-                        Undo.RegisterCompleteObjectUndo(_tree, "配置列表排列"); ScrollLayoutOptions.Copy(options, n);
-                        EditorUtility.SetDirty(_tree); AssetDatabase.SaveAssetIfDirty(_tree);
-                        if (AiMarker.Last?.tree == _tree) { AiMarker.Last.generated = false; AiMarker.Last.generationChecked = false; }
+                        PsdEditorUI.Text("按钮反馈",n.buttonColorTint?"ColorTint（生成前可改）":"None（生成前可改）");
+                        if(PsdEditorUI.CopyButton("选择按钮热区来源…"))ButtonHitSourcesWindow.Open(_tree,n);
+                        PsdEditorUI.Text("热区来源",n.buttonHitKeys==null||n.buttonHitKeys.Count==0?"全部正常视觉":n.buttonHitKeys.Count+" 个选定节点");
+                    }
+                    if(n.templateId=="Progress")PsdProgressUI.Draw(n);
+                    if(n.templateId=="ScrollView"&&PsdEditorUI.CopyButton("排列与自适应…"))ScrollLayoutWindow.Open(n,options=>
+                    {
+                        if((n.locks&(PropGroup.Component|PropGroup.Rect))!=0)throw new InvalidOperationException("请先解除组件或矩形锁定。");
+                        if(n.slot=="template"||_tree.Find(n.parentId)?.templateId=="Dropdown")throw new InvalidOperationException("Dropdown 模板由 TMP 管理排列。");
+                        Undo.RegisterCompleteObjectUndo(_tree,"配置列表排列");ScrollLayoutOptions.Copy(options,n);EditorUtility.SetDirty(_tree);AssetDatabase.SaveAssetIfDirty(_tree);
+                        if(AiMarker.Last?.tree==_tree){AiMarker.Last.generated=false;AiMarker.Last.generationChecked=false;}
                     });
-
-                int sIndex = Mathf.Max(0, Array.IndexOf(SlotChoices, n.slot ?? string.Empty));
-                sIndex = EditorGUILayout.Popup("插槽", sIndex, SlotLabels);
-                n.slot = SlotChoices[sIndex];
-                if (n.aiGeneratedGroup)
-                {
-                    EditorGUILayout.HelpBox("AI 虚拟分组：只用于节点树和 Unity 输出，不改写 PSD。", MessageType.Info);
-                    if (n.aiBoundsOverride && n.slot == "viewport")
+                    if(n.aiGeneratedGroup)
                     {
-                        var bounds = EditorGUILayout.RectIntField("AI 视口边界（PSD 坐标）", n.psdRect);
-                        bounds.x = Mathf.Clamp(bounds.x, 0, Mathf.Max(0, _tree.docSize.x - 1));
-                        bounds.y = Mathf.Clamp(bounds.y, 0, Mathf.Max(0, _tree.docSize.y - 1));
-                        bounds.width = Mathf.Clamp(bounds.width, 1, Mathf.Max(1, _tree.docSize.x - bounds.x));
-                        bounds.height = Mathf.Clamp(bounds.height, 1, Mathf.Max(1, _tree.docSize.y - bounds.y));
-                        n.psdRect = bounds;
+                        PsdEditorUI.Text("AI 虚拟分组，不改写 PSD。",EditorStyles.wordWrappedMiniLabel);
+                        if(n.aiBoundsOverride&&n.slot=="viewport")
+                        {
+                            var b=EditorGUILayout.RectIntField("AI 视口（PSD 坐标）",n.psdRect);
+                            b.x=Mathf.Clamp(b.x,0,Mathf.Max(0,_tree.docSize.x-1));b.y=Mathf.Clamp(b.y,0,Mathf.Max(0,_tree.docSize.y-1));
+                            b.width=Mathf.Clamp(b.width,1,Mathf.Max(1,_tree.docSize.x-b.x));b.height=Mathf.Clamp(b.height,1,Mathf.Max(1,_tree.docSize.y-b.y));n.psdRect=b;
+                        }
                     }
                 }
-
-                int aIndex = Mathf.Max(0, Array.IndexOf(AnchorUtil.Presets, n.anchorPreset ?? string.Empty));
-                aIndex = EditorGUILayout.Popup("锚点", aIndex, AnchorUtil.PresetLabels);
-                n.anchorPreset = AnchorUtil.Presets[aIndex];
-
-                n.generateBind = EditorGUILayout.Toggle("生成绑定字段", n.generateBind);
-                n.underSafeArea = EditorGUILayout.Toggle("放入 SafeArea", n.underSafeArea);
-                var newLocks = (PropGroup)EditorGUILayout.EnumFlagsField("保留人工修改（锁定组）", n.locks);
-                n.forceUpdateGroups |= n.locks & ~newLocks;
-                n.locks = newLocks;
-                if (n.forceUpdateGroups != PropGroup.None)
-                    EditorGUILayout.HelpBox("下次应用将用 PSD 覆盖已解锁属性：" + n.forceUpdateGroups, MessageType.Info);
-                n.nineOverride = (NineSliceOverride)EditorGUILayout.EnumPopup("九宫覆盖", n.nineOverride);
-                if (n.kind != LayerKind.Group && n.kind != LayerKind.Text)
+                if(n.kind!=LayerKind.Group&&n.kind!=LayerKind.Text)
                 {
-                    var selected = EditorGUILayout.ObjectField("指定图片（只读引用）", n.resourceOverride, typeof(UnityEngine.Object), false);
-                    if (selected == null || selected is Sprite || selected is Texture2D)
+                    using(PsdEditorUI.Section("资源与九宫 · 切图导出时"))
                     {
-                        if (selected != n.resourceOverride) { n.locks &= ~PropGroup.Sprite; n.forceUpdateGroups |= PropGroup.Sprite; }
-                        n.resourceOverride = selected;
-                    }
-                    else EditorGUILayout.HelpBox("这里只接受项目中的 Sprite 或 Texture2D。", MessageType.Warning);
-                    if (n.resourceOverride != null) EditorGUILayout.HelpBox("该图片仅引用，不切图、不覆盖其内容或导入参数。", MessageType.Info);
-                }
-                if (n.nineOverride == NineSliceOverride.Force)
-                    n.nineBorder = EditorGUILayout.Vector4Field("九宫边框(左下右上)", n.nineBorder);
-
-                if (n.templateId == "Button")
-                {
-                    EditorGUILayout.LabelField("按钮反馈", "ColorTint / 最大可见 Image");
-                    if (GUILayout.Button("选择按钮热区来源…")) ButtonHitSourcesWindow.Open(_tree, n);
-                    EditorGUILayout.LabelField("热区范围", n.buttonHitKeys == null || n.buttonHitKeys.Count == 0 ? "全部正常视觉（默认）" : "已选择 " + n.buttonHitKeys.Count + " 个来源");
-                }
-
-                if (EditorGUI.EndChangeCheck())
-                {
-                    n.source = DecisionSource.Manual;
-                    n.confidence = 1f;
-                    EditorUtility.SetDirty(_tree);
-                }
-
-                DrawReassociate(n);
-
-                EditorGUILayout.Space(4);
-                using (new EditorGUI.DisabledScope(true))
-                {
-                    EditorGUILayout.TextField("图层 ID", n.layerId.ToString());
-                    EditorGUILayout.TextField("图层类型", KindName(n.kind));
-                    EditorGUILayout.TextField("判定来源", $"{n.source} ({n.confidence:0.00})");
-                    if (n.markers.Count > 0)
-                        EditorGUILayout.TextField("图层名标记(兼容)", string.Join("  @", n.markers.ToArray()));
-                    EditorGUILayout.RectIntField("PSD 矩形", n.psdRect);
-                    EditorGUILayout.FloatField("不透明度", n.opacity);
-
-                    if (n.kind == LayerKind.Text)
-                    {
-                        EditorGUILayout.TextField("字体", n.text.font);
-                        EditorGUILayout.FloatField("字号", n.text.fontSize);
-                        EditorGUILayout.ColorField("颜色", n.text.color);
-                        EditorGUILayout.Toggle("描边", n.text.outline != null && n.text.outline.enabled);
-                        EditorGUILayout.Toggle("投影", n.text.shadow != null && n.text.shadow.enabled);
-                        EditorGUILayout.TextField("文本类型", n.text.isBox ? "段落文字" : "点文字");
-                        EditorGUILayout.LabelField("内容");
-                        EditorGUILayout.TextArea(n.text.content, GUILayout.MinHeight(40));
-                    }
-                    else if (n.kind != LayerKind.Group)
-                    {
-                        EditorGUILayout.TextField("资源", n.image.isSolid ? "纯色（不切图）" : n.image.assetPath);
-                        if (n.image.isSolid) EditorGUILayout.ColorField("颜色", n.image.solidColor);
-                        if (n.image.reusedFromLayerId >= 0) EditorGUILayout.TextField("复用自图层", n.image.reusedFromLayerId.ToString());
-                        if (!string.IsNullOrEmpty(n.image.reusedFromPath)) EditorGUILayout.TextField("复用资源", n.image.reusedFromPath);
-                        if (n.image.sliced || n.image.tiled) EditorGUILayout.Vector4Field(n.image.tiled ? "平铺边框" : "九宫边框", n.image.border);
+                        n.nineOverride=(NineSliceOverride)EditorGUILayout.EnumPopup(new GUIContent("九宫覆盖","Auto 自动识别边框；Force 使用指定边框；Forbid 不做九宫。仅设置 Sprite Border，不缩图。重新导出切图后生效；外部引用资源不修改。"),n.nineOverride);
+                        if(n.nineOverride==NineSliceOverride.Force)n.nineBorder=EditorGUILayout.Vector4Field("边框（左下右上）",n.nineBorder);
+                        var resource=EditorGUILayout.ObjectField(new GUIContent("指定图片（只读）","直接引用已有 Sprite/Texture2D，不覆盖图片及其导入配置。"),n.resourceOverride,typeof(UnityEngine.Object),false);
+                        if(resource==null||resource is Sprite||resource is Texture2D)
+                        {if(resource!=n.resourceOverride){n.locks&=~PropGroup.Sprite;n.forceUpdateGroups|=PropGroup.Sprite;}n.resourceOverride=resource;}
+                        else PsdEditorUI.Notice("只接受 Sprite 或 Texture2D。",MessageType.Warning);
                     }
                 }
-
-                if (n.kind != LayerKind.Group && !n.image.isSolid && !string.IsNullOrEmpty(n.image.assetPath))
+                using(PsdEditorUI.Section("适配 · 生成/运行时"))
                 {
-                    var tex = AssetDatabase.LoadAssetAtPath<Texture2D>(n.image.assetPath);
-                    if (tex != null)
-                    {
-                        float size = Mathf.Min(160f, position.width * 0.4f);
-                        var r = GUILayoutUtility.GetRect(size, size, GUILayout.ExpandWidth(false));
-                        EditorGUI.DrawTextureTransparent(r, tex, ScaleMode.ScaleToFit);
-                    }
+                    int ai=Mathf.Max(0,Array.IndexOf(AnchorUtil.Presets,n.anchorPreset??""));n.anchorPreset=AnchorUtil.Presets[EditorGUILayout.Popup("锚点",ai,AnchorUtil.PresetLabels)];
+                    using(new EditorGUI.DisabledScope(n.parentId!=-1))n.underSafeArea=EditorGUILayout.Toggle(new GUIContent("放入 SafeArea","仅顶层节点生效：生成时放入安全区容器，运行时按 Screen.safeArea 避让刘海/系统区域；内部子节点继承所属顶层容器。"),n.underSafeArea);
+                }
+                using(PsdEditorUI.Section("增量保护 · 改稿/迁移时"))
+                {
+                    var locks=(PropGroup)EditorGUILayout.EnumFlagsField("保留人工修改（锁定组）",n.locks);n.forceUpdateGroups|=n.locks&~locks;n.locks=locks;
+                    if(n.forceUpdateGroups!=PropGroup.None)PsdEditorUI.Notice("下次更新覆盖："+n.forceUpdateGroups,MessageType.Info);
+                    DrawReassociate(n);
+                }
+                if(EditorGUI.EndChangeCheck())
+                {n.source=DecisionSource.Manual;n.confidence=1;EditorUtility.SetDirty(_tree);if(AiMarker.Last?.tree==_tree){AiMarker.Last.generated=false;AiMarker.Last.generationChecked=false;}}
+                using(PsdEditorUI.Section("来源信息 · 只读"))
+                using(new EditorGUI.DisabledScope(true))
+                {
+                    EditorGUILayout.TextField("PSD 图层名",n.psdName);EditorGUILayout.TextField("图层 ID",n.layerId.ToString());
+                    EditorGUILayout.TextField("图层类型",KindName(n.kind));EditorGUILayout.TextField("判定来源",n.source+" ("+n.confidence.ToString("0.00")+")");
+                    EditorGUILayout.RectIntField("PSD 矩形",n.psdRect);EditorGUILayout.FloatField("不透明度",n.opacity);
+                    if(n.kind==LayerKind.Text){EditorGUILayout.TextField("字体",n.text.font);EditorGUILayout.FloatField("字号",n.text.fontSize);EditorGUILayout.ColorField("颜色",n.text.color);EditorGUILayout.TextArea(n.text.content,GUILayout.MinHeight(40));}
+                    else if(n.kind!=LayerKind.Group){EditorGUILayout.TextField("资源",n.image.isSolid?"纯色（不切图）":n.image.assetPath);if(n.image.isSolid)EditorGUILayout.ColorField("颜色",n.image.solidColor);EditorGUILayout.Vector4Field("Sprite Border",n.image.border);}
                 }
             }
-
-            EditorGUILayout.EndScrollView();
-            EditorGUILayout.EndVertical();
+            EditorGUILayout.EndScrollView();EditorGUILayout.EndVertical();
         }
 
         void DrawReassociate(PsdNode n)
@@ -544,11 +554,11 @@ namespace PsdTool
         {
             int pending = _tree.nodes.FindAll(x => x.status == NodeStatus.PendingDelete).Count;
             int suggestions = _tree.suggestions == null ? 0 : _tree.suggestions.FindAll(s => !s.done).Count;
-            _showReport = EditorGUILayout.Foldout(_showReport, $"生成校验 / 资源建议（{_tree.warnings.Count + suggestions}）", true);
+            _showReport = PsdEditorUI.CopyFoldout(_showReport, $"生成校验 / 资源建议（{_tree.warnings.Count + suggestions}）", true);
             if (!_showReport) return;
             EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField($"校验报告（{_tree.warnings.Count} 条）", EditorStyles.boldLabel);
-            if (pending > 0 && GUILayout.Button($"确认删除 {pending} 个待删除节点", GUILayout.Width(200)))
+            PsdEditorUI.Text($"校验报告（{_tree.warnings.Count} 条）", EditorStyles.boldLabel);
+            if (pending > 0 && PsdEditorUI.CopyButton($"确认删除 {pending} 个待删除节点", GUILayout.Width(200)))
             {
                 _tree.nodes.RemoveAll(x => x.status == NodeStatus.PendingDelete);
                 EditorUtility.SetDirty(_tree);
@@ -557,19 +567,19 @@ namespace PsdTool
 
             int lines = Math.Max(1, _tree.warnings.Count + (_tree.suggestions == null ? 0 : _tree.suggestions.Count));
             _reportScroll = EditorGUILayout.BeginScrollView(_reportScroll, GUILayout.Height(Mathf.Min(200, 24 + lines * 24)));
-            foreach (var w in _tree.warnings) EditorGUILayout.HelpBox(w, MessageType.Warning);
+            foreach (var w in _tree.warnings) PsdEditorUI.Notice(w, MessageType.Warning);
             if (_tree.suggestions != null)
             {
                 foreach (var s in _tree.suggestions)
                 {
                     if (s.done) continue;
                     EditorGUILayout.BeginHorizontal();
-                    EditorGUILayout.LabelField(s.message);
+                    PsdEditorUI.Text(s.message);
                     string button = s.kind == SuggestionKind.MoveToCommon ? "移到 Common"
                         : s.kind == SuggestionKind.ApplyRule ? "应用识别"
                         : s.kind == SuggestionKind.ApplyAi ? "应用 AI"
                         : "改用此图";
-                    if (GUILayout.Button(button, GUILayout.Width(110)))
+                    if (PsdEditorUI.CopyButton(button, GUILayout.Width(110)))
                         Run(() => ResourceActions.Apply(s, _tree, _settings));
                     EditorGUILayout.EndHorizontal();
                 }

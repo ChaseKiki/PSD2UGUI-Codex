@@ -34,7 +34,7 @@ namespace PsdTool
             return AiProtocol.Hash("codex-task-v1|" + fileHash + "|" + UnityEditor.AssetDatabase.AssetPathToGUID(UnityEditor.AssetDatabase.GetAssetPath(tree)) +
                 "|" + TreeJson(tree) + "|" + settings.aiImageMaxSide + "|" + settings.aiAllowStructure + "|" + settings.designResolution + "|" + settings.minHitSize);
         }
-        public static AiVisualInput Prepare(PsdTree tree, PsdToolSettings settings, bool externalTask = false)
+        public static AiVisualInput Prepare(PsdTree tree, PsdToolSettings settings, bool externalTask = false, int? focusId = null, IEnumerable<int> focusIds = null)
         {
             var input = new AiVisualInput { signature = externalTask ? TaskSignature(tree, settings) : Signature(tree, settings), treeJson = TreeJson(tree) };
             var doc = PsdParser.Parse(tree.psdPath);
@@ -43,7 +43,10 @@ namespace PsdTool
                 var composite = reader.DecodeComposite();
                 if (composite == null) throw new InvalidOperationException("PSD 没有合成预览图。请在 Photoshop 保存时启用“最大兼容”后重新解析；AI 不会使用旧切图或无图猜测。");
                 input.images.Add(EncodeFit(composite, doc.Width, doc.Height, Mathf.Clamp(settings.aiImageMaxSide, 512, 1536)));
-                input.regions.AddRange(AiRegions.Prepare(tree, composite, doc.Width, doc.Height, settings.aiImageMaxSide));
+                var requested=focusIds?.Distinct().ToArray() ?? (focusId.HasValue?new[]{focusId.Value}:null);
+                if(requested!=null&&(requested.Length==0||requested.Length>100))throw new InvalidOperationException("补识别每批请选择 1～100 个节点。");
+                if (requested!=null) foreach(int id in requested)input.regions.Add(AiRegions.Focus(tree,id,composite,doc.Width,doc.Height,settings.aiImageMaxSide));
+                else input.regions.AddRange(AiRegions.Prepare(tree, composite, doc.Width, doc.Height, settings.aiImageMaxSide));
                 var layers = tree.nodes.Where(n => n.status != NodeStatus.PendingDelete && n.kind != LayerKind.Group)
                     .OrderBy(n => n.layerId).Select(n => doc.FindLayer(n.layerId)).Where(l => l != null && l.Kind != PsdLayerKind.Text && l.Width > 0 && l.Height > 0).ToList();
                 if (externalTask && layers.Count > 1024) throw new InvalidOperationException("图片图层超过 1024，请按界面拆分 PSD 后识别，不会静默省略图层定位图。");

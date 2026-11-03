@@ -24,6 +24,9 @@ namespace PsdTool
         public List<CodexTaskRegion> regions = new List<CodexTaskRegion>();
         public List<CodexTaskLayer> layers = new List<CodexTaskLayer>();
         public List<CodexTaskImage> layerSheets = new List<CodexTaskImage>();
+        public bool focused;
+        public int focusRootId;
+        public int[] focusRootIds;
     }
     [Serializable] internal sealed class CodexTaskLayer
     {
@@ -46,6 +49,7 @@ namespace PsdTool
         public string taskId, signature, status;
         public List<CodexTaskClassification> regions;
         public List<CodexTaskStructure> structures;
+        public List<AiNodeName> names;
     }
     [Serializable] internal sealed class CodexTaskClassification
     {
@@ -61,6 +65,9 @@ namespace PsdTool
     {
         public AiRecognitionPlan plan;
         public string signature, note, folder, resultHash;
+        public bool focused;
+        public int focusRootId;
+        public int[] focusRootIds;
     }
 
     /// <summary>纯文件交接；不启动 Codex、不连接模型、不读取凭据。结果只提供区域分类，不能直接改 Unity 层级。</summary>
@@ -105,18 +112,20 @@ namespace PsdTool
             if (found == null) throw new InvalidOperationException("随包 Codex skill 缺失，请完整导入新版工具包。");
             return Path.GetDirectoryName(PathUtil.ToFullPath(found));
         }
-        internal static string Export(PsdTree tree, PsdToolSettings settings)
+        internal static string Export(PsdTree tree, PsdToolSettings settings, int? focusId = null, IEnumerable<int> focusIds = null)
         {
             if (AiTransport.Busy) throw new InvalidOperationException("先结束正在运行的本地/接口请求，再导出任务。");
             string guid = TreeGuid(tree);
             if (guid.Length == 0) throw new InvalidOperationException("请先将 PSD 解析为项目节点树，再导出任务。");
             EditorUtility.SetDirty(tree); AssetDatabase.SaveAssetIfDirty(tree);
             string skill = SkillSource();
-            var input = AiVisualInput.Prepare(tree, settings, true);
+            var requested=focusIds?.Distinct().ToArray() ?? (focusId.HasValue?new[]{focusId.Value}:null);
+            var input = AiVisualInput.Prepare(tree, settings, true, focusId,requested);
             if (input.regions.Count == 0) throw new InvalidOperationException("没有候选控件组。请先常规分组；无需规则命名。");
             string id = Guid.NewGuid().ToString("N"), folder = Path.Combine(TaskRoot, id);
             Directory.CreateDirectory(Path.Combine(folder, "regions"));
             var task = new CodexTaskManifest { taskId = id, signature = input.signature, treeGuid = guid, title = tree.panelName, createdUtc = DateTime.UtcNow.ToString("o") };
+            task.focused = requested!=null; task.focusRootIds=requested;task.focusRootId = requested?.FirstOrDefault() ?? -1;
             foreach (var node in tree.nodes.Where(n => n.status != NodeStatus.PendingDelete).OrderBy(n => n.layerId))
                 task.layers.Add(new CodexTaskLayer { id = node.layerId, parentId = node.parentId, kind = node.kind.ToString(),
                     currentType = node.templateId, slot = node.slot, locks = node.locks.ToString(), locked = AiProtocol.Protected(node), visible = node.visible,
@@ -195,6 +204,8 @@ namespace PsdTool
             var regions = normalized.regions;
             var plan = AiRegionRecognition.Compose(tree, regions, normalized.structures, settings);
             plan.regions.AddRange(normalized.unassigned);
+            plan.names = (answer.names ?? new List<AiNodeName>()).Take(1024).Where(n => n != null && tree.Find(n.layerId) != null && NodeNaming.ValidToken(n.name))
+                .GroupBy(n => n.layerId).Where(g => g.Count() == 1).Select(g => g.First()).ToList();
             foreach (var proposal in plan.controls)
             {
                 var root = proposal.nodes.FirstOrDefault(e => e.setTemplate && e.templateId != "Group" && !string.IsNullOrEmpty(e.templateId));
@@ -202,6 +213,7 @@ namespace PsdTool
                 if (classification != null && !proposal.reason.StartsWith("Codex 部件归属", StringComparison.Ordinal)) proposal.reason = "Codex：" + classification.reason + "；Unity 按来源层级和几何绑定";
             }
             return new CodexTaskImport { plan = plan, signature = task.signature, folder = folder, resultHash = HashFile(resultPath),
+                focused = task.focused, focusRootId = task.focusRootId,focusRootIds=task.focusRootIds,
                 note = "Codex 任务 " + task.taskId + "，" + regions.Count + " 个来源区域已校验；异常建议单独隔离，其余继续审核和生成。导入仅创建预览。\n" +
                     string.Join("\n", regions.Where(r => !string.IsNullOrEmpty(r.error)).Select(r => "区域 " + r.rootId + "：" + r.error)) };
         }

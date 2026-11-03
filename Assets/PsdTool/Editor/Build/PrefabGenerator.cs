@@ -79,6 +79,7 @@ namespace PsdTool
                     if (ctx.Map.TryGetValue(node.layerId, out var mapped))
                         Stamp(mapped, sourceGuid, string.IsNullOrEmpty(node.stableKey) ? "layer:" + node.layerId : node.stableKey);
                 StampHelpers(root.transform, sourceGuid);
+                if (tree.nodes.Exists(n => n.nameReviewed)) NodeNaming.NameHelpers(root.transform);
                 var draft = new Draft { Root = root, Scene = previewScene };
                 draft.Repairs.AddRange(ctx.Repairs);
                 return draft;

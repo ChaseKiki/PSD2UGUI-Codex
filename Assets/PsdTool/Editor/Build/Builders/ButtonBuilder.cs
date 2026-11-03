@@ -23,7 +23,7 @@ namespace PsdTool
             CreateVisualChildren(ctx, node, go, rootRect);
 
             var button = go.AddComponent<Button>();
-            button.transition = Selectable.Transition.ColorTint;
+            button.transition = node.buttonColorTint?Selectable.Transition.ColorTint:Selectable.Transition.None;
             var colors = ColorBlock.defaultColorBlock;
             colors.highlightedColor = new Color(.9f, .9f, .9f, 1f);
             colors.pressedColor = new Color(.7f, .7f, .7f, 1f);

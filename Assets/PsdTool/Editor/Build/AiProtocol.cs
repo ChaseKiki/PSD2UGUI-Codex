@@ -13,7 +13,9 @@ namespace PsdTool
         public int version;
         public List<AiControlProposal> controls = new List<AiControlProposal>();
         public List<AiRegionResult> regions = new List<AiRegionResult>();
+        public List<AiNodeName> names = new List<AiNodeName>();
     }
+    [Serializable] public sealed class AiNodeName { public int layerId; public string name; }
     public enum AiRegionStatus { Ready, NeedsReview, Unsupported, Failed, Covered, NotControl, Applied, Generated, Ignored }
     [Serializable] public sealed class AiRegionResult
     {
@@ -22,6 +24,7 @@ namespace PsdTool
         public float confidence;
         public AiRegionStatus status;
         public AiControlProposal recoveryProposal;
+        [NonSerialized] internal string snapshotFolder;
     }
     [Serializable] public sealed class AiControlProposal
     {
@@ -49,7 +52,7 @@ namespace PsdTool
     internal static class AiProtocol
     {
         internal static bool HasEdits(AiControlProposal proposal) => proposal != null &&
-            (proposal.nodes?.Count ?? 0) + (proposal.groups?.Count ?? 0) > 0;
+            ((proposal.nodes?.Any(n => n != null && (n.setTemplate || n.setSlot || n.setParent)) ?? false) || (proposal.groups?.Count ?? 0) > 0);
         internal const string Version = "psd-ai-region-v3";
         [Serializable] sealed class Response { public Choice[] choices; public Message message; public string error, done_reason; }
         [Serializable] sealed class Choice { public Message message; public string finish_reason; }
